@@ -1,0 +1,38 @@
+[tool.poetry]
+name = "toolforge-cli"
+version = "0.1.0"
+description = "Toolforge client"
+authors = ["David Caro <dcaro@wikimedia.org>"]
+license = "GPLv3"
+
+[tool.poetry.dependencies]
+python = "^3.7"
+click = "^8.0.3"
+
+[tool.poetry.dev-dependencies]
+black = "^21.12b0"
+coverage = "^6.2"
+flake8 = "^4.0.1"
+isort = "^5.10.1"
+pytest = "^6.2.5"
+pytest-cov = "^3.0.0"
+tox = "^3.24.5"
+
+[tool.poetry.plugins."console_scripts"]
+"toolforge" = "toolforge_cli.cli:main"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.coverage.run]
+include = ["*/toolforge_cli/*"]
+
+[tool.isort]
+profile = "black"
+multi_line_output = 3
+line_length = 120
+include_trailing_comma = true
+
+[tool.black]
+line_length = 120
