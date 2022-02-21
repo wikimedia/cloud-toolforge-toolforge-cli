@@ -20,6 +20,9 @@ Package: toolforge-cli
 Architecture: all
 Depends: python3-click,
          python3-yaml,
+         python3-cryptography,
+# tekton cli package
+         cli,
          ${misc:Depends},
          ${python3:Depends}
 Description: Command line interface for Toolforge 
