@@ -1,0 +1,29 @@
+Source: toolforge-cli
+Section: admin
+Priority: optional
+Maintainer: Wikimedia Cloud Services <cloudservices@wikimedia.org>
+Build-Depends: debhelper-compat (= 12),
+               dh-exec,
+               dh-python,
+               python3-all,
+               python3-setuptools,
+               python3-poetry,
+               python3-cachecontrol,
+               pybuild-plugin-pyproject
+Standards-Version: 4.5.1
+Homepage: https://toolforge.org
+Vcs-Browser: https://gerrit.wikimedia.org/r/cloud/toolforge/toolforge-cli
+Vcs-Git: https://gerrit.wikimedia.org/r/cloud/toolforge/toolforge-cli
+Rules-Requires-Root: no
+
+Package: toolforge-cli
+Architecture: all
+Depends: python3-click,
+         python3-yaml,
+         ${misc:Depends},
+         ${python3:Depends}
+Description: Command line interface for Toolforge 
+ This package contains the command line interface for Toolforge.
+ .
+ It provides the `toolforge` executable, which can be used to interact with the
+ Toolforge system and subsystems.
