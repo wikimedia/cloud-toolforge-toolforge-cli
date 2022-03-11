@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
+import json as json_mod
 import logging
 import os
 import subprocess
 import sys
 import time
 from pathlib import Path
-from typing import Dict
+from typing import Any, Dict, Tuple
 
 import click
 
@@ -15,6 +16,36 @@ from toolforge_cli.k8sclient import K8sAPIClient
 TOOLFORGE_PREFIX = "toolforge-"
 TBS_NAMESPACE = "image-build"
 LOGGER = logging.getLogger("toolforge" if __name__ == "__main__" else __name__)
+
+
+def _run_to_short_str(run: Dict[str, Any]) -> str:
+    status_data = next(condition for condition in run["status"]["conditions"] if condition["type"] == "Succeeded")
+    if status_data["status"] == "True" or status_data["reason"] == "Running":
+        status_color = "green"
+        status_name = "ok"
+    elif status_data["status"] == "False":
+        status_color = "red"
+        status_name = "error"
+    else:
+        status_color = "yellow"
+        status_name = status_data["status"].lower()
+
+    status = click.style(status_name, fg=status_color)
+    run_name = run["metadata"]["name"]
+    start_time = run["status"]["startTime"]
+    end_time = run["status"].get("completionTime", "running")
+    app_image = next(param for param in run["spec"]["params"] if param["name"] == "APP_IMAGE")["value"]
+    repo_url, image_name, image_tag = _app_image_to_parts(app_image)
+    builder_image = next(param for param in run["spec"]["params"] if param["name"] == "BUILDER_IMAGE")["value"]
+    source_url = next(param for param in run["spec"]["params"] if param["name"] == "SOURCE_URL")["value"]
+    return f"{run_name}\t{status}\t{start_time}\t{end_time}\t{source_url}\t{repo_url}\t{image_name}\t{image_tag}\t{builder_image}"
+
+
+def _app_image_to_parts(app_image: str) -> Tuple[str, str, str]:
+    tag = app_image.rsplit(":", 1)[-1]
+    image_name = app_image.rsplit("/", 1)[-1].split(":", 1)[0]
+    repo = app_image.rsplit("/", 1)[0]
+    return (repo, image_name, tag)
 
 
 def _run_external_command(*args, binary: str) -> None:
@@ -121,6 +152,55 @@ def build(
 @click.argument("RUN_NAME")
 def build_logs(run_name: str):
     _run_external_command("pipelinerun", "logs", "--namespace", TBS_NAMESPACE, "-f", run_name, binary="tkn")
+
+
+@toolforge.command(name="build-list")
+@click.option(
+    "--kubeconfig",
+    help="Path to the kubeconfig file.",
+    default=Path(os.environ.get("KUBECONFIG", "~/.kube/config")),
+    type=Path,
+    show_default=True,
+)
+@click.option(
+    "--json",
+    help="If set, will output in json format.",
+    is_flag=True,
+)
+def build_list(kubeconfig: Path, json: bool) -> None:
+    k8s_client = K8sAPIClient.from_file(kubeconfig=kubeconfig, namespace=TBS_NAMESPACE)
+    runs = k8s_client.get_objects(kind="pipelineruns", selector=f"user={k8s_client.user}")
+    if not json:
+        click.echo(
+            click.style(
+                "run_name\tstatus\tstart_time\tend_time\tsource_url\trepo_url\timage_name\timage_tag\tbuilder_image",
+                bold=True,
+            ),
+        )
+
+    for run in sorted(runs, key=lambda run: run["status"]["startTime"], reverse=True):
+        app_image = next(param for param in run["spec"]["params"] if param["name"] == "APP_IMAGE")["value"]
+        repo_url, image_name, image_tag = _app_image_to_parts(app_image=app_image)
+        if not json:
+            click.echo(_run_to_short_str(run=run))
+        else:
+            click.echo(
+                json_mod.dumps(
+                    {
+                        "name": run["metadata"]["name"],
+                        "params": {
+                            "image_name": image_name,
+                            "image_tag": image_tag,
+                            "repo_url": repo_url,
+                        },
+                        "status": {
+                            "stated_at": run["status"]["startTime"],
+                            "end_time": run["status"].get("completionTime", "running"),
+                        },
+                    },
+                    indent=4,
+                )
+            )
 
 
 def main():
