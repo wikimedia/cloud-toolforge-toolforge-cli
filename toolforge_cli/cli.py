@@ -117,6 +117,12 @@ def build(
     )
 
 
+@toolforge.command(name="build-logs")
+@click.argument("RUN_NAME")
+def build_logs(run_name: str):
+    _run_external_command("pipelinerun", "logs", "--namespace", TBS_NAMESPACE, "-f", run_name, binary="tkn")
+
+
 def main():
     # this is needed to setup the logging before the subcommand discovery
     res = toolforge.parse_args(ctx=click.Context(command=toolforge), args=sys.argv)
