@@ -90,7 +90,7 @@ def _add_discovered_subcommands(cli: click.Group) -> click.Group:
             if help:
                 args = ["--help"] + list(args)
 
-            _run_external_command(*args, binary=binary)
+            _run_external_command(*args, binary=str(binary.resolve()))
 
     return cli
 

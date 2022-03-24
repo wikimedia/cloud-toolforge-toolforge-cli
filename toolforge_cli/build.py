@@ -1,6 +1,6 @@
 from copy import deepcopy
 from pathlib import Path
-from typing import Dict
+from typing import Any, Dict
 
 from toolforge_cli.k8sclient import K8sAPIClient
 
@@ -36,9 +36,9 @@ def get_app_image_url(
     return f"{image_repository}/{user}/{image_name}:{image_tag}"
 
 
-def get_pipeline_run_spec(app_image: str, source_url: str, builder_image: str, username: str) -> Dict[str, str]:
+def get_pipeline_run_spec(app_image: str, source_url: str, builder_image: str, username: str) -> Dict[str, Any]:
     # TODO: rethink if there's a better way of building this object, specially the hardcoded indices
-    my_pipeline = deepcopy(PIPELINE_RUN_SKELETON)
+    my_pipeline: Dict[str, Any] = deepcopy(PIPELINE_RUN_SKELETON)
     my_pipeline["metadata"]["generateName"] = f"{username}-buildpacks-pipelinerun-"
     # TODO: we might want to move this to a mutator hook instead
     my_pipeline["metadata"]["labels"]["user"] = username

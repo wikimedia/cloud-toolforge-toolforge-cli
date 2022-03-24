@@ -11,7 +11,7 @@ from cryptography import x509
 # Kubernetes API endpoint
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
-StatusCode = str
+StatusCode = int
 
 
 class NotFound(Exception):
@@ -144,23 +144,29 @@ class K8sAPIClient:
 
             raise
 
-    def delete_objects(self, kind: str, selector: Optional[str] = None) -> StatusCode:
+    def delete_objects(self, kind: str, selector: Optional[str] = None) -> List[StatusCode]:
+        status_codes = []
         if kind == "services":
             # Service does not have a Delete Collection option
             for svc in self.get_objects(kind, selector):
-                self._delete(
-                    url=kind,
-                    name=svc["metadata"]["name"],
-                    version=K8sAPIClient.KIND_TO_VERSION[kind],
+                status_codes.append(
+                    self._delete(
+                        url=kind,
+                        name=svc["metadata"]["name"],
+                        version=K8sAPIClient.KIND_TO_VERSION[kind],
+                    )
                 )
         else:
-            self._delete(
-                url=kind,
-                params={"labelSelector": selector},
-                version=K8sAPIClient.KIND_TO_VERSION[kind],
+            status_codes.append(
+                self._delete(
+                    url=kind,
+                    params={"labelSelector": selector},
+                    version=K8sAPIClient.KIND_TO_VERSION[kind],
+                )
             )
+        return status_codes
 
-    def create_object(self, kind: str, spec: Dict[str, Any]) -> requests.Response:
+    def create_object(self, kind: str, spec: Dict[str, Any]) -> Dict[str, Any]:
         return self._post(
             url=kind,
             json=spec,
