@@ -25,6 +25,7 @@ class BadConfig(Exception):
 
 class K8sAPIClient:
     KIND_TO_VERSION = {
+        "pods": "v1",
         "pipelineruns": "tekton.dev/v1beta1",
     }
 
