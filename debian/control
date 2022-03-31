@@ -18,9 +18,7 @@ Rules-Requires-Root: no
 
 Package: toolforge-cli
 Architecture: all
-Depends: python3-click,
-         python3-yaml,
-         python3-cryptography,
+Depends:
 # tekton cli package
          cli,
          ${misc:Depends},
