@@ -43,7 +43,7 @@ class K8sAPIClient:
         current_context = None
         for context in contexts:
             if context["name"] == "toolforge":
-                return context
+                return context["context"]
             elif context["name"] == current_context_name:
                 current_context = context
 
