@@ -6,6 +6,7 @@ import requests
 import urllib3
 import yaml
 from cryptography import x509
+from cryptography.hazmat.backends import default_backend
 
 # T253412: Disable warnings about unverifed TLS certs when talking to the
 # Kubernetes API endpoint
@@ -56,7 +57,8 @@ class K8sAPIClient:
 
     @staticmethod
     def _get_user_from_cert(cert_path: Path) -> str:
-        mycert = x509.load_pem_x509_certificate(cert_path.read_bytes())
+        # we have to pass a backend for backwards compatibility with cryptography<3.1 shipped with buster
+        mycert = x509.load_pem_x509_certificate(cert_path.read_bytes(), backend=default_backend())
         response = mycert.subject.get_attributes_for_oid(x509.NameOID.COMMON_NAME)
         return response[0].value
 
