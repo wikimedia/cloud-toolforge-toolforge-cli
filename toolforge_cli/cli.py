@@ -110,6 +110,9 @@ def _get_step_details_lines(task: Dict[str, Any]) -> List[str]:
         elif "waiting" in step:
             step_status = click.style(f"waiting", fg="white")
             reason = step["waiting"].get("reason", "UnownReason")
+        elif "running" in step:
+            step_status = click.style(f"running", fg="white")
+            reason = f"started at [{step['running'].get('startedAt', 'unknown')}]"
         else:
             step_status = click.style(f"unknown", fg="yellow")
             reason = step
