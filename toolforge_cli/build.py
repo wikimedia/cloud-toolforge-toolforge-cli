@@ -1,8 +1,5 @@
 from copy import deepcopy
-from pathlib import Path
 from typing import Any, Dict
-
-from toolforge_cli.k8sclient import K8sAPIClient
 
 PIPELINE_RUN_SKELETON = {
     "apiVersion": "tekton.dev/v1beta1",

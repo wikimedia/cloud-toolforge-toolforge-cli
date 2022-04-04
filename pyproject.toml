@@ -24,6 +24,7 @@ tox = "^3.24.5"
 mypy = "^0.931"
 types-requests = "^2.27.14"
 types-PyYAML = "^6.0.5"
+types-setuptools = "^57.4.11"
 
 [tool.poetry.plugins."console_scripts"]
 "toolforge" = "toolforge_cli.cli:main"
@@ -40,6 +41,16 @@ profile = "black"
 multi_line_output = 3
 line_length = 120
 include_trailing_comma = true
+skip_gitignore = true
 
 [tool.black]
 line_length = 120
+
+[tool.mypy]
+exclude = [
+    "^debian/",  # debian packaging files
+    "^.cache",
+    "^build",
+    "^dist",
+    "^.tox",
+]

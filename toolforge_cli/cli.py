@@ -5,7 +5,6 @@ import os
 import subprocess
 import sys
 import time
-from curses import KEY_CLOSE
 from pathlib import Path
 from typing import Any, Dict, List, Tuple
 
@@ -87,10 +86,10 @@ def _get_init_containers_details(run_name: str, task_name: str, k8s_client: K8sA
             init_container_status_str = click.style("error", fg="red")
             reason = f"{init_container_status['terminated']['reason']}:{init_container_status['terminated']['message']}"
         elif "waiting" in init_container_status:
-            init_container_status_str = click.style(f"waiting", fg="white")
+            init_container_status_str = click.style("waiting", fg="white")
             reason = init_container_status["waiting"].get("reason", "UnownReason")
         elif "terminated" in init_container_status:
-            init_container_status_str = click.style(f"ok", fg="green")
+            init_container_status_str = click.style("ok", fg="green")
             reason = f"{init_container_status['terminated']['reason']}"
 
         init_containers_lines.append(
@@ -108,13 +107,13 @@ def _get_step_details_lines(task: Dict[str, Any]) -> List[str]:
             step_status = click.style("error", fg="red")
             reason = step["terminated"]["reason"]
         elif "waiting" in step:
-            step_status = click.style(f"waiting", fg="white")
+            step_status = click.style("waiting", fg="white")
             reason = step["waiting"].get("reason", "UnownReason")
         elif "running" in step:
-            step_status = click.style(f"running", fg="white")
+            step_status = click.style("running", fg="white")
             reason = f"started at [{step['running'].get('startedAt', 'unknown')}]"
         else:
-            step_status = click.style(f"unknown", fg="yellow")
+            step_status = click.style("unknown", fg="yellow")
             reason = step
 
         steps_details_lines.append(f"{click.style('Step:', bold=True)} {step['name']} - {step_status}({reason})")
