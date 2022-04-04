@@ -169,6 +169,19 @@ class K8sAPIClient:
             )
         return status_codes
 
+    def delete_object(self, kind: str, name: Optional[str] = None) -> None:
+        try:
+            self._delete(
+                url=kind,
+                name=name,
+                version=K8sAPIClient.KIND_TO_VERSION[kind],
+            )
+        except requests.exceptions.HTTPError as error:
+            if error.response.status_code == 404:
+                raise NotFound(f"Unable to find an object with name '{name}' of kind '{kind}'") from error
+
+            raise
+
     def create_object(self, kind: str, spec: Dict[str, Any]) -> Dict[str, Any]:
         return self._post(
             url=kind,

@@ -41,7 +41,7 @@ def _run_to_short_str(run: Dict[str, Any]) -> str:
     status = click.style(status_name, fg=status_color)
     run_name = run["metadata"]["name"]
     start_time = run["status"]["startTime"]
-    end_time = run["status"].get("completionTime", "running")
+    end_time = run["status"].get("completionTime", click.style("running", fg="green"))
     app_image = next(param for param in run["spec"]["params"] if param["name"] == "APP_IMAGE")["value"]
     repo_url, image_name, image_tag = _app_image_to_parts(app_image)
     builder_image = next(param for param in run["spec"]["params"] if param["name"] == "BUILDER_IMAGE")["value"]
@@ -329,6 +329,60 @@ def build_list(kubeconfig: Path, json: bool) -> None:
                     indent=4,
                 )
             )
+
+
+@toolforge.command(name="build-delete")
+@click.option(
+    "--kubeconfig",
+    help="Path to the kubeconfig file.",
+    default=Path(os.environ.get("KUBECONFIG", "~/.kube/config")),
+    type=Path,
+    show_default=True,
+)
+@click.option(
+    "--all",
+    help="Delete all the current builds.",
+    is_flag=True,
+)
+@click.option(
+    "--yes-i-know",
+    "-y",
+    help="Don't ask for confirmation.",
+    is_flag=True,
+)
+@click.argument(
+    "build_name",
+    nargs=-1,
+)
+def build_delete(
+    kubeconfig: Path,
+    build_name: List[str],
+    all: bool,
+    yes_i_know: bool,
+) -> None:
+    k8s_client = K8sAPIClient.from_file(kubeconfig=kubeconfig, namespace=TBS_NAMESPACE)
+    all_user_runs = k8s_client.get_objects(kind="pipelineruns", selector=f"user={k8s_client.user}")
+
+    if not build_name and not all:
+        click.echo("No run passed to delete.")
+        return
+
+    runs_to_delete = []
+    for run in all_user_runs:
+        if run["metadata"]["name"] in build_name or all:
+            runs_to_delete.append(run)
+
+    if len(runs_to_delete) == 0:
+        click.echo("No runs to delete, maybe there was a typo? (try listing them with toolforge build-list)")
+        return
+
+    if not yes_i_know:
+        click.confirm(f"I'm going to delete {len(runs_to_delete)} runs, continue?", abort=True)
+
+    for run in runs_to_delete:
+        k8s_client.delete_object(kind="pipelineruns", name=run["metadata"]["name"])
+        k8s_client.delete_objects(kind="pods", selector=f"tekton.dev/pipelineRun={run['metadata']['name']}")
+    click.echo(f"Deleted {len(runs_to_delete)} runs.")
 
 
 @toolforge.command(name="build-show")
