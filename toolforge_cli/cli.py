@@ -32,8 +32,12 @@ def _run_to_short_str(run: Dict[str, Any]) -> str:
         status_color = "green"
         status_name = "ok"
     elif _run_has_failed(status_data):
-        status_color = "red"
-        status_name = "error"
+        if status_data["reason"].endswith("Cancelled"):
+            status_color = "green"
+            status_name = "cancelled"
+        else:
+            status_color = "red"
+            status_name = "error"
     else:
         status_color = "yellow"
         status_name = status_data["status"].lower()
@@ -61,8 +65,12 @@ def _get_status_data_lines(k8s_obj: Dict[str, Any]) -> List[str]:
         status_color = "green"
         status_name = "ok"
     elif _run_has_failed(status_data):
-        status_color = "red"
-        status_name = "error"
+        if status_data["reason"].endswith("Cancelled"):
+            status_color = "green"
+            status_name = "cancelled"
+        else:
+            status_color = "red"
+            status_name = "error"
     else:
         status_color = "yellow"
         status_name = status_data["status"].lower()
@@ -102,9 +110,16 @@ def _get_init_containers_details(run_name: str, task_name: str, k8s_client: K8sA
 def _get_step_details_lines(task: Dict[str, Any]) -> List[str]:
     steps_details_lines = []
     for step in task["status"]["steps"]:
-        step_status = click.style("ok", fg="green")
+        step_status = click.style("unknown", fg="yellow")
+        reason = step
         if "terminated" in step and step["terminated"]["exitCode"] != 0:
-            step_status = click.style("error", fg="red")
+            reason = step["terminated"]["reason"]
+            if reason.endswith("Cancelled"):
+                step_status = click.style("cancelled", fg="green")
+            else:
+                step_status = click.style("error", fg="red")
+        elif "terminated" in step and step["terminated"]["exitCode"] == 0:
+            step_status = click.style("ok", fg="green")
             reason = step["terminated"]["reason"]
         elif "waiting" in step:
             step_status = click.style("waiting", fg="white")
@@ -112,9 +127,6 @@ def _get_step_details_lines(task: Dict[str, Any]) -> List[str]:
         elif "running" in step:
             step_status = click.style("running", fg="white")
             reason = f"started at [{step['running'].get('startedAt', 'unknown')}]"
-        else:
-            step_status = click.style("unknown", fg="yellow")
-            reason = step
 
         steps_details_lines.append(f"{click.style('Step:', bold=True)} {step['name']} - {step_status}({reason})")
 
@@ -276,7 +288,7 @@ def build(
     )
 
 
-@toolforge.command(name="build-logs")
+@toolforge.command(name="build-logs", help="Shows the logs for a build, only admins for now.")
 @click.argument("RUN_NAME")
 def build_logs(run_name: str):
     _run_external_command("pipelinerun", "logs", "--namespace", TBS_NAMESPACE, "-f", run_name, binary="tkn")
@@ -331,7 +343,66 @@ def build_list(kubeconfig: Path, json: bool) -> None:
             )
 
 
-@toolforge.command(name="build-delete")
+@toolforge.command(name="build-cancel", help="Cancels a running build, though does nothing for stopped ones.")
+@click.option(
+    "--kubeconfig",
+    help="Path to the kubeconfig file.",
+    default=Path(os.environ.get("KUBECONFIG", "~/.kube/config")),
+    type=Path,
+    show_default=True,
+)
+@click.option(
+    "--all",
+    help="Cancel all the current builds.",
+    is_flag=True,
+)
+@click.option(
+    "--yes-i-know",
+    "-y",
+    help="Don't ask for confirmation.",
+    is_flag=True,
+)
+@click.argument(
+    "build_name",
+    nargs=-1,
+)
+def build_cancel(
+    kubeconfig: Path,
+    build_name: List[str],
+    all: bool,
+    yes_i_know: bool,
+) -> None:
+    k8s_client = K8sAPIClient.from_file(kubeconfig=kubeconfig, namespace=TBS_NAMESPACE)
+    all_user_runs = k8s_client.get_objects(kind="pipelineruns", selector=f"user={k8s_client.user}")
+
+    if not build_name and not all:
+        click.echo("No run passed to cancel.")
+        return
+
+    runs_to_cancel = []
+    for run in all_user_runs:
+        if run["metadata"]["name"] in build_name or all:
+            runs_to_cancel.append(run)
+
+    if len(runs_to_cancel) == 0:
+        click.echo("No runs to cancel, maybe there was a typo? (try listing them with toolforge build-list)")
+        return
+
+    if not yes_i_know:
+        click.confirm(f"I'm going to cancel {len(runs_to_cancel)} runs, continue?", abort=True)
+
+    for run in runs_to_cancel:
+        # see https://tekton.dev/docs/pipelines/pipelineruns/#cancelling-a-pipelinerun
+        k8s_client.patch_object(
+            kind="pipelineruns",
+            name=run["metadata"]["name"],
+            json_patches=[{"op": "add", "path": "/spec/status", "value": "PipelineRunCancelled"}],
+        )
+
+    click.echo(f"Cancelled {len(runs_to_cancel)} runs.")
+
+
+@toolforge.command(name="build-delete", help="Deletes a build, only admins can do it for now.")
 @click.option(
     "--kubeconfig",
     help="Path to the kubeconfig file.",
@@ -381,6 +452,7 @@ def build_delete(
 
     for run in runs_to_delete:
         k8s_client.delete_object(kind="pipelineruns", name=run["metadata"]["name"])
+        # only admins can do this
         k8s_client.delete_objects(kind="pods", selector=f"tekton.dev/pipelineRun={run['metadata']['name']}")
     click.echo(f"Deleted {len(runs_to_delete)} runs.")
 

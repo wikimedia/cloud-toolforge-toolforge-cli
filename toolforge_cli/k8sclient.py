@@ -122,6 +122,14 @@ class K8sAPIClient:
         response.raise_for_status()
         return response
 
+    def _patch(self, url, **kwargs) -> requests.Response:
+        requests_kwargs = self._make_requests_kwargs(url, **kwargs)
+        response = self.session.patch(**requests_kwargs)
+        if response.status_code == 400:
+            raise Exception(f"Bad request: {response.text}")
+        response.raise_for_status()
+        return response
+
     def _delete(self, url: str, **kwargs) -> StatusCode:
         response = self.session.delete(**self._make_requests_kwargs(url, **kwargs))
         response.raise_for_status()
@@ -187,4 +195,12 @@ class K8sAPIClient:
             url=kind,
             json=spec,
             version=K8sAPIClient.KIND_TO_VERSION[kind],
+        ).json()
+
+    def patch_object(self, kind: str, name: str, json_patches: List[Dict[str, Any]]) -> Dict[str, Any]:
+        return self._patch(
+            url=f"{kind}/{name}",
+            json=json_patches,
+            version=K8sAPIClient.KIND_TO_VERSION[kind],
+            headers={"Content-type": "application/json-patch+json"},
         ).json()
