@@ -24,6 +24,19 @@ That will run the tests and create a virtualenv that you can use to manually deb
 ```
 
 ## Building the debian packages
+### Using docker
+This is the recommended way of building the packages, as it's agnostic of the OS/distro you are using.
+
+It will not allow you to sign your package though, so if you need that try using the manual process.
+
+```
+~:$ utils/build_deb.sh
+```
+
+The first time it might take a bit more time as it will build the core image to build packages, downloading many
+dependencies. The next run it will not need to download all those dependencies, so it will be way faster.
+
+### Manual process
 For this you'll need debuild installed:
 ```
 ~:$ sudo apt install debuild
