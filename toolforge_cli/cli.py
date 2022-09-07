@@ -2,6 +2,7 @@
 import json as json_mod
 import logging
 import os
+import pwd
 import subprocess
 import sys
 import time
@@ -241,7 +242,7 @@ def _add_discovered_subcommands(cli: click.Group) -> click.Group:
     "-n",
     "--image-name",
     help="Image identifier for the builder that will be used to build the project (ex. python).",
-    required=True,
+    default=pwd.getpwuid(os.getuid()).pw_name,
     show_default=True,
 )
 @click.option(
@@ -260,7 +261,7 @@ def _add_discovered_subcommands(cli: click.Group) -> click.Group:
 @click.option(
     "--dest-repository",
     help="FQDN to the OIC repository to push the image to, without the protocol (no http/https)",
-    default="harbor.toolsbeta.wmflabs.org",
+    default="harbor.tools.wmflabs.org",
     show_default=True,
 )
 @click.option(
