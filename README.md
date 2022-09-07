@@ -64,3 +64,8 @@ If you want to sign it, you will have to do something like:
 ```
 /path/to/repo/toolforge-cli:$ debuild -kmy@key.org
 ```
+
+### Uploading to the toolforge repository
+
+Once you have built the package you want, you can uploade it following:
+https://wikitech.wikimedia.org/wiki/Portal:Toolforge/Admin/Packaging#Uploading_a_package
