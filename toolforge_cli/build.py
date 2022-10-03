@@ -13,7 +13,7 @@ PIPELINE_RUN_SKELETON = {
         "serviceAccountName": "buildpacks-service-account",
         "pipelineRef": {"name": "buildpacks"},
         "params": [
-            {"name": "BUILDER_IMAGE", "value": "docker-registry.tools.wmflabs.org/toolforge-buster0-builder"},
+            {"name": "BUILDER_IMAGE", "value": "docker-registry.tools.wmflabs.org/toolforge-bullseye0-builder"},
             {"name": "APP_IMAGE", "value": "192.168.49.1/minikube-user/python:snap"},
             {"name": "SOURCE_URL", "value": "https://github.com/david-caro/wm-lol"},
             {"name": "USER_ID", "value": "61312"},

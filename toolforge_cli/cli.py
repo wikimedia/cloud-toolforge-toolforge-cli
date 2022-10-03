@@ -255,7 +255,7 @@ def _add_discovered_subcommands(cli: click.Group) -> click.Group:
 @click.option(
     "--builder-image",
     help="This is the image identifier for the buildpack builder, without protocol (no http/https).",
-    default="docker-registry.tools.wmflabs.org/toolforge-buster0-builder",
+    default="docker-registry.tools.wmflabs.org/toolforge-bullseye0-builder",
     show_default=True,
 )
 @click.option(
