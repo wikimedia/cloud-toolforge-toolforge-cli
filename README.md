@@ -4,6 +4,11 @@ CLI to run toolforge related commands
 
 ## Local development environment (guideline)
 
+### Requirements
+
+You need to have [Poetry](https://github.com/python-poetry/poetry) installed globally. While you can install it with package managers such as `pip` or `homebrew`, it's highly recommended to use the official installer:
+https://python-poetry.org/docs/#installing-with-the-official-installer
+
 ### Tox on debian testing
 
 Clone the repo including commit hooks (instructions here https://gerrit.wikimedia.org/r/admin/repos/cloud/toolforge/toolforge-cli).
@@ -20,7 +25,7 @@ Move to the directory where you cloned the repo, and run tox:
 
 That will run the tests and create a virtualenv that you can use to manually debug anything you need, to enter it:
 ```
-/path/to/repo/toolforge-cli:$ source .tox/py-tests/bin/activate
+/path/to/repo/toolforge-cli:$ source .tox/py3-tests/bin/activate
 ```
 
 ## Building the debian packages
