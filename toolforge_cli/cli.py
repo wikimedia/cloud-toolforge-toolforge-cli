@@ -481,21 +481,23 @@ def build_show(run_name: str, kubeconfig: Path, json: bool) -> None:
     if not json:
         click.echo(_run_to_details_str(run=run, k8s_client=k8s_client))
     else:
-        json_mod.dumps(
-            {
-                "name": run["metadata"]["name"],
-                "params": {
-                    "image_name": image_name,
-                    "image_tag": image_tag,
-                    "repo_url": repo_url,
+        click.echo(
+            json_mod.dumps(
+                {
+                    "name": run["metadata"]["name"],
+                    "params": {
+                        "image_name": image_name,
+                        "image_tag": image_tag,
+                        "repo_url": repo_url,
+                    },
+                    "status": {
+                        "succeeded": status["status"],
+                        "message": status["message"],
+                        "reason": status["reason"],
+                    },
                 },
-                "status": {
-                    "succeeded": status["Status"],
-                    "message": status["Message"],
-                    "reason": status["Reason"],
-                },
-            },
-            indent=4,
+                indent=4,
+            )
         )
 
 
