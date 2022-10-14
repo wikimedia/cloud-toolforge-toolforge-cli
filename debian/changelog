@@ -1,4 +1,10 @@
-toolforge-cli (1) buster; urgency=medium
+toolforge-cli (0.2.0) buster; urgency=low
+
+  * Minor fixes
+
+ -- David Caro <dcaro@wikimedia.org>  Fri, 14 Oct 2022 11:07:54 +0200
+
+toolforge-cli (0.1) buster; urgency=medium
 
   * Initial Release.
 
