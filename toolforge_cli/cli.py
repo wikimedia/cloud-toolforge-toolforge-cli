@@ -51,7 +51,10 @@ def _run_to_short_str(run: Dict[str, Any]) -> str:
     repo_url, image_name, image_tag = _app_image_to_parts(app_image)
     builder_image = next(param for param in run["spec"]["params"] if param["name"] == "BUILDER_IMAGE")["value"]
     source_url = next(param for param in run["spec"]["params"] if param["name"] == "SOURCE_URL")["value"]
-    return f"{run_name}\t{status}\t{start_time}\t{end_time}\t{source_url}\t{repo_url}\t{image_name}\t{image_tag}\t{builder_image}"
+    return (
+        f"{run_name}\t{status}\t{start_time}\t{end_time}\t{source_url}\t{repo_url}\t{image_name}\t{image_tag}"
+        f"\t{builder_image}"
+    )
 
 
 def _get_status_data_lines(k8s_obj: Dict[str, Any]) -> List[str]:
@@ -102,7 +105,8 @@ def _get_init_containers_details(run_name: str, task_name: str, k8s_client: K8sA
             reason = f"{init_container_status['terminated']['reason']}"
 
         init_containers_lines.append(
-            f"{click.style('Init-container:', bold=True)} {init_container['name']} - {init_container_status_str}({reason})"
+            f"{click.style('Init-container:', bold=True)} {init_container['name']} - "
+            f"{init_container_status_str}({reason})"
         )
 
     return init_containers_lines

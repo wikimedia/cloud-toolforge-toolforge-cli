@@ -1,4 +1,7 @@
-"""Originally copied from https://github.com/wikimedia/cloud-toolforge-jobs-framework-api/blob/main/common/k8sclient.py"""
+"""
+Originally copied from
+https://github.com/wikimedia/cloud-toolforge-jobs-framework-api/blob/main/common/k8sclient.py
+"""
 from pathlib import Path
 from typing import Any, Dict, List, Optional, cast
 
@@ -51,7 +54,8 @@ class K8sAPIClient:
 
         if current_context is None:
             raise BadConfig(
-                f"Unable to find a 'toolforge' context or current context '{current_context}' context in the kubectl config."
+                f"Unable to find a 'toolforge' context or current context '{current_context}' context in the kubectl "
+                "config."
             )
 
         return current_context["context"]
@@ -76,7 +80,8 @@ class K8sAPIClient:
         self.kubectl_user = cast(Dict[str, Any], self._find_object_in_config("users", self.context["user"]))
         if "client-certificate" not in self.kubectl_user:
             raise BadConfig(
-                f"Currently only certificate based authorization is supported, but none found for user {self.kubectl_user['name']}."
+                "Currently only certificate based authorization is supported, but none found for user "
+                f"{self.kubectl_user['name']}."
             )
 
         self.user = self._get_user_from_cert(cert_path=Path(self.kubectl_user["client-certificate"]))
