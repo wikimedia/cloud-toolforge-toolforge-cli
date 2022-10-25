@@ -67,6 +67,12 @@ class K8sAPIClient:
         response = mycert.subject.get_attributes_for_oid(x509.NameOID.COMMON_NAME)
         return response[0].value
 
+    @staticmethod
+    def _get_org_name_from_cert(cert_path: Path) -> str:
+        mycert = x509.load_pem_x509_certificate(cert_path.read_bytes(), backend=default_backend())
+        response = mycert.subject.get_attributes_for_oid(x509.NameOID.ORGANIZATION_NAME)
+        return response[0].value
+
     def __init__(self, config: Dict[str, Any], timeout_s: int = 10, namespace: Optional[str] = None):
         self.config = config
         self.timeout_s = timeout_s
@@ -85,6 +91,7 @@ class K8sAPIClient:
             )
 
         self.user = self._get_user_from_cert(cert_path=Path(self.kubectl_user["client-certificate"]))
+        self.org_name = self._get_org_name_from_cert(cert_path=Path(self.kubectl_user["client-certificate"]))
         self.session = requests.Session()
         self.session.cert = (self.kubectl_user["client-certificate"], self.kubectl_user["client-key"])
         # T253412: We are deliberately not validating the api endpoint's TLS

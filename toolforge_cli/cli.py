@@ -16,6 +16,7 @@ from toolforge_cli.k8sclient import K8sAPIClient
 
 TOOLFORGE_PREFIX = "toolforge-"
 TBS_NAMESPACE = "image-build"
+ADMIN_GROUP_NAMES = ["admins", "system:masters"]
 LOGGER = logging.getLogger("toolforge" if __name__ == "__main__" else __name__)
 
 
@@ -295,7 +296,26 @@ def build(
 
 @toolforge.command(name="build-logs", help="Shows the logs for a build, only admins for now.")
 @click.argument("RUN_NAME")
-def build_logs(run_name: str):
+@click.option(
+    "--kubeconfig",
+    help="Path to the kubeconfig file.",
+    default=Path(os.environ.get("KUBECONFIG", "~/.kube/config")),
+    type=Path,
+    show_default=True,
+)
+def build_logs(run_name: str, kubeconfig: Path) -> None:
+    k8s_client = K8sAPIClient.from_file(kubeconfig=kubeconfig, namespace=TBS_NAMESPACE)
+
+    if k8s_client.org_name in ADMIN_GROUP_NAMES:
+        click.echo(
+            click.style(
+                "This feature is not yet available for non-admin users, but will be soon!",
+                fg="yellow",
+                bold=True,
+            ),
+        )
+        return
+
     _run_external_command("pipelinerun", "logs", "--namespace", TBS_NAMESPACE, "-f", run_name, binary="tkn")
 
 
