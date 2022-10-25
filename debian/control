@@ -19,8 +19,7 @@ Rules-Requires-Root: no
 Package: toolforge-cli
 Architecture: all
 Depends:
-# tekton cli package
-         cli,
+         tektoncd-cli,
          ${misc:Depends},
          ${python3:Depends}
 Description: Command line interface for Toolforge 
