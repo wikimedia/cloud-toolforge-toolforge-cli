@@ -1,3 +1,10 @@
+toolforge-cli (0.2.1) buster; urgency=low
+
+  * Use new tektoncd-cli package from apt.wikimedia.org (T317143)
+  * flake8: fix configuration
+
+ -- Francesco Negri <fnegri@wikimedia.org>  Fri, 28 Oct 2022 14:57:27 +0000
+
 toolforge-cli (0.2.0) buster; urgency=low
 
   * Minor fixes

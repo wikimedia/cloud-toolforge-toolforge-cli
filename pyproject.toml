@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "toolforge-cli"
-version = "0.2.0"
+version = "0.2.1"
 description = "Toolforge client"
 authors = ["David Caro <dcaro@wikimedia.org>"]
 license = "GPLv3"
