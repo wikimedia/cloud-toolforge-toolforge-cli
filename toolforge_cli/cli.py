@@ -270,7 +270,7 @@ def _add_discovered_subcommands(cli: click.Group) -> click.Group:
     bins_path = os.environ.get("PATH", ".")
     subcommands: Dict[str, Path] = {}
     LOGGER.debug("Looking for subcommands...")
-    for dir_str in bins_path.split(":"):
+    for dir_str in reversed(bins_path.split(":")):
         dir_path = Path(dir_str)
         LOGGER.debug(f"Checking under {dir_path}...")
         for command in dir_path.glob(f"{TOOLFORGE_PREFIX}*"):
@@ -281,15 +281,16 @@ def _add_discovered_subcommands(cli: click.Group) -> click.Group:
 
     LOGGER.debug(f"Found {len(subcommands)} subcommands.")
     for name, binary in subcommands.items():
+        bin_path = str(binary.resolve())
 
         @cli.command(name=name)
         @click.option("-h", "--help", is_flag=True, default=False)
         @click.argument("args", nargs=-1, type=click.UNPROCESSED)
-        def _new_command(args, help: bool):  # noqa
+        def _new_command(args, help: bool, bin_path: str = bin_path):  # noqa
             if help:
                 args = ["--help"] + list(args)
 
-            _run_external_command(*args, binary=str(binary.resolve()))
+            _run_external_command(*args, binary=bin_path)
 
     return cli
 

@@ -1,3 +1,9 @@
+toolforge-cli (0.2.2) buster; urgency=low
+
+  * Fixed subcommand discovery
+
+ -- David Caro <dcaro@wikimedia.org>  Tue, 22 Nov 2022 14:21:59 +0200
+
 toolforge-cli (0.2.1) buster; urgency=low
 
   * Use new tektoncd-cli package from apt.wikimedia.org (T317143)
