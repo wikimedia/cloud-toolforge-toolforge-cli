@@ -115,23 +115,32 @@ def _get_init_containers_details(run_name: str, task_name: str, k8s_client: K8sA
 
 def _get_step_details_lines(task: Dict[str, Any]) -> List[str]:
     steps_details_lines = []
+    status = {
+        "ok": click.style("ok", fg="green"),
+        "waiting": click.style("waiting", fg="white"),
+        "running": click.style("running", fg="white"),
+        "cancelled": click.style("cancelled", fg="green"),
+        "error": click.style("error", fg="red"),
+        "unknown": click.style("unknown", fg="yellow"),
+    }
+
     for step in task["status"]["steps"]:
-        step_status = click.style("unknown", fg="yellow")
+        step_status = status["unknown"]
         reason = step
         if "terminated" in step and step["terminated"]["exitCode"] != 0:
             reason = step["terminated"]["reason"]
             if reason.endswith("Cancelled"):
-                step_status = click.style("cancelled", fg="green")
+                step_status = status["cancelled"]
             else:
-                step_status = click.style("error", fg="red")
+                step_status = status["error"]
         elif "terminated" in step and step["terminated"]["exitCode"] == 0:
-            step_status = click.style("ok", fg="green")
+            step_status = status["ok"]
             reason = step["terminated"]["reason"]
         elif "waiting" in step:
-            step_status = click.style("waiting", fg="white")
-            reason = step["waiting"].get("reason", "UnownReason")
+            step_status = status["waiting"]
+            reason = step["waiting"].get("reason", "UnknownReason")
         elif "running" in step:
-            step_status = click.style("running", fg="white")
+            step_status = status["running"]
             reason = f"started at [{step['running'].get('startedAt', 'unknown')}]"
 
         steps_details_lines.append(f"{click.style('Step:', bold=True)} {step['name']} - {step_status}({reason})")
@@ -141,24 +150,30 @@ def _get_step_details_lines(task: Dict[str, Any]) -> List[str]:
 
 def _get_task_details_lines(run: Dict[str, Any], k8s_client: K8sAPIClient) -> List[str]:
     tasks_details_lines = []
+
     for task in run["status"]["taskRuns"].values():
         tasks_details_lines.append(f"{click.style('Task:', bold=True)} {task['pipelineTaskName']}")
         tasks_details_lines.extend("    " + line for line in _get_status_data_lines(k8s_obj=task))
         tasks_details_lines.append("")
-        tasks_details_lines.append(click.style("    Steps:", bold=True))
-        tasks_details_lines.extend("        " + line for line in _get_step_details_lines(task=task))
-        tasks_details_lines.append("")
 
-        status_data = next(condition for condition in task["status"]["conditions"] if condition["type"] == "Succeeded")
-        if _run_has_failed(status_data) and all("waiting" in step for step in task["status"]["steps"]):
-            # Sometimes the task fails in the init containers, so if that happened, show the errors there too
-            tasks_details_lines.append(click.style("    Init containers:", bold=True))
-            tasks_details_lines.extend(
-                "        " + line
-                for line in _get_init_containers_details(
-                    run_name=run["metadata"]["name"], task_name=task["pipelineTaskName"], k8s_client=k8s_client
-                )
+        # A task can fail before any steps are executed
+        if "steps" in task["status"]:
+            tasks_details_lines.append(click.style("    Steps:", bold=True))
+            tasks_details_lines.extend("        " + line for line in _get_step_details_lines(task=task))
+            tasks_details_lines.append("")
+
+            status_data = next(
+                condition for condition in task["status"]["conditions"] if condition["type"] == "Succeeded"
             )
+            if _run_has_failed(status_data) and all("waiting" in step for step in task["status"]["steps"]):
+                # Sometimes the task fails in the init containers, so if that happened, show the errors there too
+                tasks_details_lines.append(click.style("    Init containers:", bold=True))
+                tasks_details_lines.extend(
+                    "        " + line
+                    for line in _get_init_containers_details(
+                        run_name=run["metadata"]["name"], task_name=task["pipelineTaskName"], k8s_client=k8s_client
+                    )
+                )
 
     return tasks_details_lines
 
