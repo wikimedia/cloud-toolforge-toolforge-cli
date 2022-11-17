@@ -28,30 +28,68 @@ def _run_has_failed(status_data: Dict[str, Any]) -> bool:
     return status_data["status"] == "False"
 
 
-def _run_to_short_str(run: Dict[str, Any]) -> str:
-    status_data = next(condition for condition in run["status"]["conditions"] if condition["type"] == "Succeeded")
+def _get_run_status(status_data: Dict[str, str]) -> str:
     if _run_is_ok(status_data):
-        status_color = "green"
-        status_name = "ok"
+        return "ok"
     elif _run_has_failed(status_data):
         if status_data["reason"].endswith("Cancelled"):
-            status_color = "green"
-            status_name = "cancelled"
+            return "cancelled"
         else:
-            status_color = "red"
-            status_name = "error"
+            return "error"
     else:
-        status_color = "yellow"
-        status_name = status_data["status"].lower()
+        return status_data["status"].lower()
 
-    status = click.style(status_name, fg=status_color)
+
+def _get_run_data(run: Dict[str, Any]) -> Dict[str, Any]:
     run_name = run["metadata"]["name"]
-    start_time = run["status"]["startTime"]
-    end_time = run["status"].get("completionTime", click.style("running", fg="green"))
     app_image = next(param for param in run["spec"]["params"] if param["name"] == "APP_IMAGE")["value"]
-    repo_url, image_name, image_tag = _app_image_to_parts(app_image)
+    repo_url, image_name, image_tag = _app_image_to_parts(app_image=app_image)
     builder_image = next(param for param in run["spec"]["params"] if param["name"] == "BUILDER_IMAGE")["value"]
     source_url = next(param for param in run["spec"]["params"] if param["name"] == "SOURCE_URL")["value"]
+
+    status_data = None
+    if "status" in run:
+        status_data = next(condition for condition in run["status"]["conditions"] if condition["type"] == "Succeeded")
+
+    start_time = run["status"]["startTime"] if status_data else "pending"
+    end_time = run["status"].get("completionTime", "running") if status_data else "N/A"
+    status = _get_run_status(status_data) if status_data else "not started"
+
+    return {
+        "name": run_name,
+        "params": {
+            "image_name": image_name,
+            "image_tag": image_tag,
+            "repo_url": repo_url,
+            "source_url": source_url,
+            "builder_image": builder_image,
+        },
+        "start_time": start_time,
+        "end_time": end_time,
+        "status": status,
+    }
+
+
+def _run_to_short_str(run_data: Dict[str, Any]) -> str:
+    status_style = {
+        "not started": click.style("not started", fg="white"),
+        "ok": click.style("ok", fg="green"),
+        "cancelled": click.style("cancelled", fg="green"),
+        "error": click.style("error", fg="red"),
+    }
+
+    run_name = run_data["name"]
+    status_name = run_data["status"]
+    status = status_style.get(status_name, click.style(status_name, fg="yellow"))
+    params = run_data["params"]
+    source_url = params["source_url"]
+    repo_url = params["repo_url"]
+    image_name = params["image_name"]
+    builder_image = params["builder_image"]
+    image_tag = params["image_tag"]
+    start_time = run_data["start_time"]
+    end_time = run_data["end_time"]
+
     return (
         f"{run_name}\t{status}\t{start_time}\t{end_time}\t{source_url}\t{repo_url}\t{image_name}\t{image_tag}"
         f"\t{builder_image}"
@@ -280,7 +318,7 @@ def _add_discovered_subcommands(cli: click.Group) -> click.Group:
 )
 @click.option(
     "--dest-repository",
-    help="FQDN to the OIC repository to push the image to, without the protocol (no http/https)",
+    help="FQDN to the OCI repository to push the image to, without the protocol (no http/https)",
     default="harbor.tools.wmflabs.org",
     show_default=True,
 )
@@ -350,6 +388,7 @@ def build_logs(run_name: str, kubeconfig: Path) -> None:
 def build_list(kubeconfig: Path, json: bool) -> None:
     k8s_client = K8sAPIClient.from_file(kubeconfig=kubeconfig, namespace=TBS_NAMESPACE)
     runs = k8s_client.get_objects(kind="pipelineruns", selector=f"user={k8s_client.user}")
+
     if not json:
         click.echo(
             click.style(
@@ -358,29 +397,12 @@ def build_list(kubeconfig: Path, json: bool) -> None:
             ),
         )
 
-    for run in sorted(runs, key=lambda run: run["status"]["startTime"], reverse=True):
-        app_image = next(param for param in run["spec"]["params"] if param["name"] == "APP_IMAGE")["value"]
-        repo_url, image_name, image_tag = _app_image_to_parts(app_image=app_image)
-        if not json:
-            click.echo(_run_to_short_str(run=run))
+    for run in sorted(runs, key=lambda run: run["metadata"]["creationTimestamp"], reverse=True):
+        run_data = _get_run_data(run)
+        if json:
+            click.echo(json_mod.dumps(run_data, indent=4))
         else:
-            click.echo(
-                json_mod.dumps(
-                    {
-                        "name": run["metadata"]["name"],
-                        "params": {
-                            "image_name": image_name,
-                            "image_tag": image_tag,
-                            "repo_url": repo_url,
-                        },
-                        "status": {
-                            "stated_at": run["status"]["startTime"],
-                            "end_time": run["status"].get("completionTime", "running"),
-                        },
-                    },
-                    indent=4,
-                )
-            )
+            click.echo(_run_to_short_str(run_data))
 
 
 @toolforge.command(name="build-cancel", help="Cancels a running build, though does nothing for stopped ones.")

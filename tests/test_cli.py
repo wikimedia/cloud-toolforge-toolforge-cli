@@ -6,7 +6,7 @@ from unittest.mock import MagicMock, Mock, call, patch
 
 import pytest
 
-from toolforge_cli.cli import _add_discovered_subcommands, _get_task_details_lines, toolforge
+from toolforge_cli.cli import _add_discovered_subcommands, _get_run_data, _get_task_details_lines, toolforge
 
 FIXTURES_PATH = Path(__file__).parent / "fixtures"
 
@@ -25,6 +25,65 @@ def successful_pipeline_run():
 @pytest.fixture
 def oom_pipeline_run():
     return _get_run_from_pipeline_k8s_object(FIXTURES_PATH / "pipeline_oom_run.json")
+
+
+@pytest.fixture
+def pipeline_run_without_status():
+    return _get_run_from_pipeline_k8s_object(FIXTURES_PATH / "pipeline_without_status.json")
+
+
+def test__get_run_data_from_successful_pipeline_run(successful_pipeline_run):
+    actual = _get_run_data(successful_pipeline_run)
+    expected = {
+        "name": "minikube-user-buildpacks-pipelinerun-khl99",
+        "params": {
+            "image_name": "python",
+            "image_tag": "snap",
+            "repo_url": "192.168.65.2/minikube-user",
+            "source_url": "https://github.com/david-caro/wm-lol",
+            "builder_image": "docker-registry.tools.wmflabs.org/toolforge-bullseye0-builder:latest",
+        },
+        "start_time": "2022-11-08T09:07:35Z",
+        "end_time": "2022-11-08T09:11:06Z",
+        "status": "ok",
+    }
+    assert actual == expected
+
+
+def test__get_run_data_from_failed_pipeline_run(oom_pipeline_run):
+    actual = _get_run_data(oom_pipeline_run)
+    expected = {
+        "name": "test-buildpacks-pipelinerun-7h7c7",
+        "params": {
+            "image_name": "python",
+            "image_tag": "snap",
+            "repo_url": "harbor.toolsbeta.wmflabs.org/test",
+            "source_url": "https://github.com/david-caro/wm-lol.git",
+            "builder_image": "docker-registry.tools.wmflabs.org/toolforge-buster0-builder",
+        },
+        "start_time": "2022-09-27T08:09:22Z",
+        "end_time": "2022-09-27T08:09:58Z",
+        "status": "error",
+    }
+    assert actual == expected
+
+
+def test__get_run_data_from_pipeline_run_without_status(pipeline_run_without_status):
+    actual = _get_run_data(pipeline_run_without_status)
+    expected = {
+        "name": "minikube-user-buildpacks-pipelinerun-mkgjp",
+        "params": {
+            "image_name": "dcaro",
+            "image_tag": "latest",
+            "repo_url": "harbor.tools.wmflabs.org/minikube-user",
+            "source_url": "https://github.com/david-caro/wm-lol",
+            "builder_image": "docker-registry.tools.wmflabs.org/toolforge-bullseye0-builder",
+        },
+        "start_time": "pending",
+        "end_time": "N/A",
+        "status": "not started",
+    }
+    assert actual == expected
 
 
 def test__get_task_details_from_successful_pipeline_run(successful_pipeline_run):
