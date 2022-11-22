@@ -6,8 +6,9 @@ import pwd
 import subprocess
 import sys
 import time
+from functools import wraps
 from pathlib import Path
-from typing import Any, Dict, List, Tuple
+from typing import Any, Callable, Dict, List, Tuple
 
 import click
 
@@ -260,12 +261,6 @@ def _run_external_command(*args, binary: str) -> None:
         raise subprocess.CalledProcessError(returncode=proc.returncode, output=None, stderr=None, cmd=cmd)
 
 
-@click.group(name="toolforge", help="Toolforge command line")
-@click.option("-v", "--verbose", help="Show extra verbose output", is_flag=True)
-def toolforge(verbose: bool) -> None:
-    pass
-
-
 def _add_discovered_subcommands(cli: click.Group) -> click.Group:
     bins_path = os.environ.get("PATH", ".")
     subcommands: Dict[str, Path] = {}
@@ -299,25 +294,53 @@ def _add_discovered_subcommands(cli: click.Group) -> click.Group:
     return cli
 
 
-@toolforge.command(name="build", help="Build your project to run on toolforge.")
+def shared_build_options(func: Callable) -> Callable:
+    @click.option(
+        "--kubeconfig",
+        help="Path to the kubeconfig file.",
+        default=Path(os.environ.get("KUBECONFIG", "~/.kube/config")),
+        type=Path,
+        show_default=True,
+    )
+    @click.option("-v", "--verbose", help="Show extra verbose output", is_flag=True)
+    @wraps(func)
+    def wrapper(*args, **kwargs) -> Callable:
+        return func(*args, **kwargs)
+
+    return wrapper
+
+
+@click.version_option()
+@click.group(name="toolforge", help="Toolforge command line")
+@click.option("-v", "--verbose", help="Show extra verbose output", is_flag=True)
+def toolforge(verbose: bool) -> None:
+    pass
+
+
+@toolforge.group(name="build", help="Build your project from source code")
+def build():
+    pass
+
+
+@build.command(name="start", help="Start a pipeline to build a container image from source code")
 @click.argument("SOURCE_GIT_URL")
 @click.option(
     "-n",
     "--image-name",
-    help="Image identifier for the builder that will be used to build the project (ex. python).",
+    help="Image identifier for the builder that will be used to build the project (ex. python)",
     default=pwd.getpwuid(os.getuid()).pw_name,
     show_default=True,
 )
 @click.option(
     "-t",
     "--image-tag",
-    help="Tag to tag the generated image with.",
+    help="Tag to tag the generated image with",
     default="latest",
     show_default=True,
 )
 @click.option(
     "--builder-image",
-    help="This is the image identifier for the buildpack builder, without protocol (no http/https).",
+    help="This is the image identifier for the buildpack builder, without protocol (no http/https)",
     default="docker-registry.tools.wmflabs.org/toolforge-bullseye0-builder",
     show_default=True,
 )
@@ -327,15 +350,15 @@ def _add_discovered_subcommands(cli: click.Group) -> click.Group:
     default="harbor.tools.wmflabs.org",
     show_default=True,
 )
-@click.option(
-    "--kubeconfig",
-    help="Path to the kubeconfig file.",
-    default=Path(os.environ.get("KUBECONFIG", "~/.kube/config")),
-    type=Path,
-    show_default=True,
-)
-def build(
-    dest_repository: str, source_git_url: str, image_name: str, image_tag: str, builder_image: str, kubeconfig: Path
+@shared_build_options
+def build_start(
+    dest_repository: str,
+    source_git_url: str,
+    image_name: str,
+    image_tag: str,
+    builder_image: str,
+    kubeconfig: Path,
+    **kwargs,
 ) -> None:
 
     k8s_client = K8sAPIClient.from_file(kubeconfig=kubeconfig, namespace=TBS_NAMESPACE)
@@ -348,20 +371,14 @@ def build(
     response = k8s_client.create_object(kind="pipelineruns", spec=pipeline_run_spec)
     run_name = response["metadata"]["name"]
     click.echo(
-        f"Building '{source_git_url}' -> '{app_image}'\nYou can see the logs with:\n\ttoolforge build-logs '{run_name}'"
+        f"Building '{source_git_url}' -> '{app_image}'\nYou can see the logs with:\n\ttoolforge build logs '{run_name}'"
     )
 
 
-@toolforge.command(name="build-logs", help="Shows the logs for a build, only admins for now.")
+@build.command(name="logs", help="Show the logs for a build (only admins for now)")
 @click.argument("RUN_NAME")
-@click.option(
-    "--kubeconfig",
-    help="Path to the kubeconfig file.",
-    default=Path(os.environ.get("KUBECONFIG", "~/.kube/config")),
-    type=Path,
-    show_default=True,
-)
-def build_logs(run_name: str, kubeconfig: Path) -> None:
+@shared_build_options
+def build_logs(run_name: str, kubeconfig: Path, **kwargs) -> None:
     k8s_client = K8sAPIClient.from_file(kubeconfig=kubeconfig, namespace=TBS_NAMESPACE)
 
     if k8s_client.org_name in ADMIN_GROUP_NAMES:
@@ -377,20 +394,14 @@ def build_logs(run_name: str, kubeconfig: Path) -> None:
     _run_external_command("pipelinerun", "logs", "--namespace", TBS_NAMESPACE, "-f", run_name, binary="tkn")
 
 
-@toolforge.command(name="build-list")
-@click.option(
-    "--kubeconfig",
-    help="Path to the kubeconfig file.",
-    default=Path(os.environ.get("KUBECONFIG", "~/.kube/config")),
-    type=Path,
-    show_default=True,
-)
+@build.command(name="list", help="List builds")
 @click.option(
     "--json",
-    help="If set, will output in json format.",
+    help="If set, will output in json format",
     is_flag=True,
 )
-def build_list(kubeconfig: Path, json: bool) -> None:
+@shared_build_options
+def build_list(kubeconfig: Path, json: bool, **kwargs) -> None:
     k8s_client = K8sAPIClient.from_file(kubeconfig=kubeconfig, namespace=TBS_NAMESPACE)
     runs = k8s_client.get_objects(kind="pipelineruns", selector=f"user={k8s_client.user}")
 
@@ -410,14 +421,8 @@ def build_list(kubeconfig: Path, json: bool) -> None:
             click.echo(_run_to_short_str(run_data))
 
 
-@toolforge.command(name="build-cancel", help="Cancels a running build, though does nothing for stopped ones.")
-@click.option(
-    "--kubeconfig",
-    help="Path to the kubeconfig file.",
-    default=Path(os.environ.get("KUBECONFIG", "~/.kube/config")),
-    type=Path,
-    show_default=True,
-)
+@build.command(name="cancel", help="Cancel a running build (does nothing for stopped ones)")
+@click.option("-v", "--verbose", help="Show extra verbose output", is_flag=True)
 @click.option(
     "--all",
     help="Cancel all the current builds.",
@@ -433,12 +438,8 @@ def build_list(kubeconfig: Path, json: bool) -> None:
     "build_name",
     nargs=-1,
 )
-def build_cancel(
-    kubeconfig: Path,
-    build_name: List[str],
-    all: bool,
-    yes_i_know: bool,
-) -> None:
+@shared_build_options
+def build_cancel(kubeconfig: Path, build_name: List[str], all: bool, yes_i_know: bool, **kwargs) -> None:
     k8s_client = K8sAPIClient.from_file(kubeconfig=kubeconfig, namespace=TBS_NAMESPACE)
     all_user_runs = k8s_client.get_objects(kind="pipelineruns", selector=f"user={k8s_client.user}")
 
@@ -452,7 +453,7 @@ def build_cancel(
             runs_to_cancel.append(run)
 
     if len(runs_to_cancel) == 0:
-        click.echo("No runs to cancel, maybe there was a typo? (try listing them with toolforge build-list)")
+        click.echo("No runs to cancel, maybe there was a typo? (try listing them with toolforge build list)")
         return
 
     if not yes_i_know:
@@ -466,43 +467,32 @@ def build_cancel(
             json_patches=[{"op": "add", "path": "/spec/status", "value": "PipelineRunCancelled"}],
         )
 
-    click.echo(f"Cancelled {len(runs_to_cancel)} runs.")
+    click.echo(f"Cancelled {len(runs_to_cancel)} runs")
 
 
-@toolforge.command(name="build-delete", help="Deletes a build, only admins can do it for now.")
-@click.option(
-    "--kubeconfig",
-    help="Path to the kubeconfig file.",
-    default=Path(os.environ.get("KUBECONFIG", "~/.kube/config")),
-    type=Path,
-    show_default=True,
-)
+@build.command(name="delete", help="Delete a build (only admins for now)")
 @click.option(
     "--all",
-    help="Delete all the current builds.",
+    help="Delete all the current builds",
     is_flag=True,
 )
 @click.option(
     "--yes-i-know",
     "-y",
-    help="Don't ask for confirmation.",
+    help="Don't ask for confirmation",
     is_flag=True,
 )
 @click.argument(
     "build_name",
     nargs=-1,
 )
-def build_delete(
-    kubeconfig: Path,
-    build_name: List[str],
-    all: bool,
-    yes_i_know: bool,
-) -> None:
+@shared_build_options
+def build_delete(kubeconfig: Path, build_name: List[str], all: bool, yes_i_know: bool, **kwargs) -> None:
     k8s_client = K8sAPIClient.from_file(kubeconfig=kubeconfig, namespace=TBS_NAMESPACE)
     all_user_runs = k8s_client.get_objects(kind="pipelineruns", selector=f"user={k8s_client.user}")
 
     if not build_name and not all:
-        click.echo("No run passed to delete.")
+        click.echo("No run passed to delete")
         return
 
     runs_to_delete = []
@@ -511,7 +501,7 @@ def build_delete(
             runs_to_delete.append(run)
 
     if len(runs_to_delete) == 0:
-        click.echo("No runs to delete, maybe there was a typo? (try listing them with toolforge build-list)")
+        click.echo("No runs to delete, maybe there was a typo? (try listing them with toolforge build list)")
         return
 
     if not yes_i_know:
@@ -524,21 +514,15 @@ def build_delete(
     click.echo(f"Deleted {len(runs_to_delete)} runs.")
 
 
-@toolforge.command(name="build-show")
+@build.command(name="show", help="Show details for a specific build")
 @click.argument("RUN_NAME")
 @click.option(
-    "--kubeconfig",
-    help="Path to the kubeconfig file.",
-    default=Path(os.environ.get("KUBECONFIG", "~/.kube/config")),
-    type=Path,
-    show_default=True,
-)
-@click.option(
     "--json",
-    help="If set, will output in json format.",
+    help="If set, will output in json format",
     is_flag=True,
 )
-def build_show(run_name: str, kubeconfig: Path, json: bool) -> None:
+@shared_build_options
+def build_show(run_name: str, kubeconfig: Path, json: bool, **kwargs) -> None:
     k8s_client = K8sAPIClient.from_file(kubeconfig=kubeconfig, namespace=TBS_NAMESPACE)
     run = k8s_client.get_object(kind="pipelineruns", name=run_name)
     app_image = next(param for param in run["spec"]["params"] if param["name"] == "APP_IMAGE")["value"]
