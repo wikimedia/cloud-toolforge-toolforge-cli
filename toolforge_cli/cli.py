@@ -551,7 +551,7 @@ def build_show(run_name: str, kubeconfig: Path, json: bool, **kwargs) -> None:
         )
 
 
-def main():
+def main() -> int:
     # this is needed to setup the logging before the subcommand discovery
     res = toolforge.parse_args(ctx=click.Context(command=toolforge), args=sys.argv)
     if "-v" in res or "--verbose" in res:
@@ -560,7 +560,12 @@ def main():
         logging.basicConfig(level=logging.INFO)
 
     _add_discovered_subcommands(cli=toolforge)
-    toolforge()
+    try:
+        toolforge()
+    except subprocess.CalledProcessError as err:
+        return err.returncode
+
+    return 0
 
 
 if __name__ == "__main__":
