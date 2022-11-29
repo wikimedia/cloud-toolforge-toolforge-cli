@@ -138,7 +138,7 @@ def test_add_discovered_subcommands_finds_single_binary_in_path():
     with patch.dict(os.environ, {"PATH": str(FIXTURES_PATH / "single_binary")}):
         _add_discovered_subcommands(cli=mycommand)
 
-    mycommand.command.assert_called_once_with(name="binary")
+    mycommand.command.assert_called_once_with(name="binary", context_settings={"ignore_unknown_options": True})
 
 
 def test_add_discovered_subcommands_finds_multiple_binaries_in_path():
@@ -146,7 +146,13 @@ def test_add_discovered_subcommands_finds_multiple_binaries_in_path():
     with patch.dict(os.environ, {"PATH": str(FIXTURES_PATH / "multiple_binaries")}):
         _add_discovered_subcommands(cli=mycommand)
 
-    mycommand.command.assert_has_calls(calls=[call(name="one"), call(name="two")], any_order=True)
+    mycommand.command.assert_has_calls(
+        calls=[
+            call(name="one", context_settings={"ignore_unknown_options": True}),
+            call(name="two", context_settings={"ignore_unknown_options": True}),
+        ],
+        any_order=True,
+    )
 
 
 def test_add_discovered_subcommands_finds_nested_binaries_in_path():
@@ -156,7 +162,13 @@ def test_add_discovered_subcommands_finds_nested_binaries_in_path():
     ):
         _add_discovered_subcommands(cli=mycommand)
 
-    mycommand.command.assert_has_calls(calls=[call(name="nested"), call(name="simple")], any_order=True)
+    mycommand.command.assert_has_calls(
+        calls=[
+            call(name="nested", context_settings={"ignore_unknown_options": True}),
+            call(name="simple", context_settings={"ignore_unknown_options": True}),
+        ],
+        any_order=True,
+    )
 
 
 def test_add_discovered_subcommands_finds_mixed_files_in_path():
@@ -164,4 +176,4 @@ def test_add_discovered_subcommands_finds_mixed_files_in_path():
     with patch.dict(os.environ, {"PATH": str(FIXTURES_PATH / "mixed_files")}):
         _add_discovered_subcommands(cli=mycommand)
 
-    mycommand.command.assert_called_once_with(name="plugin")
+    mycommand.command.assert_called_once_with(name="plugin", context_settings={"ignore_unknown_options": True})

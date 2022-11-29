@@ -249,7 +249,7 @@ def _app_image_to_parts(app_image: str) -> Tuple[str, str, str]:
 
 def _run_external_command(*args, binary: str) -> None:
     cmd = [binary, *args]
-    LOGGER.debug("Running command: {cmd}")
+    LOGGER.debug(f"Running command: {cmd}")
     proc = subprocess.Popen(args=cmd, bufsize=0, stdin=sys.stdin, stdout=sys.stdout, stderr=sys.stderr, shell=False)
     returncode = proc.poll()
     while returncode is None:
@@ -283,13 +283,17 @@ def _add_discovered_subcommands(cli: click.Group) -> click.Group:
     for name, binary in subcommands.items():
         bin_path = str(binary.resolve())
 
-        @cli.command(name=name)
-        @click.option("-h", "--help", is_flag=True, default=False)
+        @cli.command(
+            name=name,
+            context_settings=dict(
+                ignore_unknown_options=True,
+            ),
+        )
+        @click.option("--help", is_flag=True, default=False)
         @click.argument("args", nargs=-1, type=click.UNPROCESSED)
         def _new_command(args, help: bool, bin_path: str = bin_path):  # noqa
             if help:
                 args = ["--help"] + list(args)
-
             _run_external_command(*args, binary=bin_path)
 
     return cli
