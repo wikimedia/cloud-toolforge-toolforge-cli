@@ -6,7 +6,13 @@ from unittest.mock import MagicMock, Mock, call, patch
 
 import pytest
 
-from toolforge_cli.cli import _add_discovered_subcommands, _get_run_data, _get_task_details_lines, toolforge
+from toolforge_cli.cli import (
+    _add_discovered_subcommands,
+    _get_run_data,
+    _get_status_data,
+    _get_task_details_lines,
+    toolforge,
+)
 
 FIXTURES_PATH = Path(__file__).parent / "fixtures"
 
@@ -30,6 +36,36 @@ def oom_pipeline_run():
 @pytest.fixture
 def pipeline_run_without_status():
     return _get_run_from_pipeline_k8s_object(FIXTURES_PATH / "pipeline_without_status.json")
+
+
+def test__get_status_data_from_sucessful_pipeline_run(successful_pipeline_run):
+    actual = _get_status_data(successful_pipeline_run)
+    expected = {
+        "start_time": "2022-11-08T09:07:35Z",
+        "end_time": "2022-11-08T09:11:06Z",
+        "status": "ok",
+        "reason": "Succeeded",
+        "message": "Tasks Completed: 1 (Failed: 0, Cancelled 0), Skipped: 0",
+    }
+    assert actual == expected
+
+
+def test__get_status_data_from_failed_pipeline_run(oom_pipeline_run):
+    actual = _get_status_data(oom_pipeline_run)
+    expected = {
+        "start_time": "2022-09-27T08:09:22Z",
+        "end_time": "2022-09-27T08:09:58Z",
+        "status": "error",
+        "reason": "Failed",
+        "message": "Tasks Completed: 1 (Failed: 1, Cancelled 0), Skipped: 0",
+    }
+    assert actual == expected
+
+
+def test__get_status_data_from_pipeline_run_without_status(pipeline_run_without_status):
+    actual = _get_status_data(pipeline_run_without_status)
+    expected = {"start_time": "pending", "end_time": "N/A", "status": "not started", "reason": "N/A", "message": "N/A"}
+    assert actual == expected
 
 
 def test__get_run_data_from_successful_pipeline_run(successful_pipeline_run):
@@ -108,6 +144,13 @@ def test__get_task_details_from_successful_pipeline_run(successful_pipeline_run)
         "        \x1b[1mStep:\x1b[0m results - \x1b[32mok\x1b[0m(Completed)",
         "",
     ]
+    assert actual == expected
+
+
+def test__get_task_details_from_pipeline_run_without_status(pipeline_run_without_status):
+    k8s_client = Mock()
+    actual = _get_task_details_lines(pipeline_run_without_status, k8s_client)
+    expected = []
     assert actual == expected
 
 

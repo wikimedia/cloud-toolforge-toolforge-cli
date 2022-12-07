@@ -41,6 +41,25 @@ def _get_run_status(status_data: Dict[str, str]) -> str:
         return status_data["status"].lower()
 
 
+def _get_status_data(run: Dict[str, Any]) -> Dict[str, str]:
+    info = None
+    if "status" in run:
+        info = next(info for info in run["status"]["conditions"] if info["type"] == "Succeeded")
+
+    if info:
+        start_time = run["status"]["startTime"]
+        end_time = run["status"].get("completionTime", "running")
+        status = _get_run_status(info)
+        reason = info["reason"]
+        message = info["message"]
+    else:
+        start_time = "pending"
+        status = "not started"
+        end_time = reason = message = "N/A"
+
+    return {"start_time": start_time, "end_time": end_time, "status": status, "reason": reason, "message": message}
+
+
 def _get_run_data(run: Dict[str, Any]) -> Dict[str, Any]:
     run_name = run["metadata"]["name"]
     app_image = next(param for param in run["spec"]["params"] if param["name"] == "APP_IMAGE")["value"]
@@ -48,13 +67,10 @@ def _get_run_data(run: Dict[str, Any]) -> Dict[str, Any]:
     builder_image = next(param for param in run["spec"]["params"] if param["name"] == "BUILDER_IMAGE")["value"]
     source_url = next(param for param in run["spec"]["params"] if param["name"] == "SOURCE_URL")["value"]
 
-    status_data = None
-    if "status" in run:
-        status_data = next(condition for condition in run["status"]["conditions"] if condition["type"] == "Succeeded")
-
-    start_time = run["status"]["startTime"] if status_data else "pending"
-    end_time = run["status"].get("completionTime", "running") if status_data else "N/A"
-    status = _get_run_status(status_data) if status_data else "not started"
+    status_data = _get_status_data(run)
+    start_time = status_data["start_time"]
+    end_time = status_data["end_time"]
+    status = status_data["status"]
 
     return {
         "name": run_name,
@@ -99,29 +115,28 @@ def _run_to_short_str(run_data: Dict[str, Any]) -> str:
 
 def _get_status_data_lines(k8s_obj: Dict[str, Any]) -> List[str]:
     status_data_lines = []
-    status_data = next(condition for condition in k8s_obj["status"]["conditions"] if condition["type"] == "Succeeded")
-    start_time = k8s_obj["status"]["startTime"]
-    status_data_lines.append(f"{click.style('Start time:', bold=True)} {start_time}")
-    end_time = k8s_obj["status"].get("completionTime", click.style("running", fg="green"))
-    status_data_lines.append(f"{click.style('End time:', bold=True)} {end_time}")
+    status_data = _get_status_data(k8s_obj)
 
-    if _run_is_ok(status_data):
+    start_time = status_data["start_time"]
+    end_time = status_data["end_time"]
+    status = status_data["status"]
+    reason = status_data["reason"]
+    message = status_data["message"]
+
+    if status == "ok" or status == "cancelled":
         status_color = "green"
-        status_name = "ok"
-    elif _run_has_failed(status_data):
-        if status_data["reason"].endswith("Cancelled"):
-            status_color = "green"
-            status_name = "cancelled"
-        else:
-            status_color = "red"
-            status_name = "error"
+    elif status == "error":
+        status_color = "red"
     else:
         status_color = "yellow"
-        status_name = status_data["status"].lower()
 
-    status = f"{click.style(status_name, fg=status_color)}({status_data['reason']})"
+    end_time = click.style(end_time, fg="green") if end_time == "running" else end_time
+    status = f"{click.style(status, fg=status_color)}({reason})"
+
+    status_data_lines.append(f"{click.style('Start time:', bold=True)} {start_time}")
+    status_data_lines.append(f"{click.style('End time:', bold=True)} {end_time}")
     status_data_lines.append(f"{click.style('Status:', bold=True)} {status}")
-    status_data_lines.append(f"{click.style('Message:', bold=True)} {status_data['message']}")
+    status_data_lines.append(f"{click.style('Message:', bold=True)} {message}")
 
     return status_data_lines
 
@@ -190,7 +205,7 @@ def _get_step_details_lines(task: Dict[str, Any]) -> List[str]:
 def _get_task_details_lines(run: Dict[str, Any], k8s_client: K8sAPIClient) -> List[str]:
     tasks_details_lines = []
 
-    for task in run["status"]["taskRuns"].values():
+    for task in run.get("status", {}).get("taskRuns", {}).values():
         tasks_details_lines.append(f"{click.style('Task:', bold=True)} {task['pipelineTaskName']}")
         tasks_details_lines.extend("    " + line for line in _get_status_data_lines(k8s_obj=task))
         tasks_details_lines.append("")
@@ -201,10 +216,10 @@ def _get_task_details_lines(run: Dict[str, Any], k8s_client: K8sAPIClient) -> Li
             tasks_details_lines.extend("        " + line for line in _get_step_details_lines(task=task))
             tasks_details_lines.append("")
 
-            status_data = next(
-                condition for condition in task["status"]["conditions"] if condition["type"] == "Succeeded"
-            )
-            if _run_has_failed(status_data) and all("waiting" in step for step in task["status"]["steps"]):
+            status_data = _get_status_data(task)
+            if status_data["status"] in ["cancelled", "error"] and all(
+                "waiting" in step for step in task["status"]["steps"]
+            ):
                 # Sometimes the task fails in the init containers, so if that happened, show the errors there too
                 tasks_details_lines.append(click.style("    Init containers:", bold=True))
                 tasks_details_lines.extend(
@@ -527,7 +542,7 @@ def build_show(run_name: str, kubeconfig: Path, json: bool, **kwargs) -> None:
     run = k8s_client.get_object(kind="pipelineruns", name=run_name)
     app_image = next(param for param in run["spec"]["params"] if param["name"] == "APP_IMAGE")["value"]
     repo_url, image_name, image_tag = _app_image_to_parts(app_image=app_image)
-    status = next(condition for condition in run["status"]["conditions"] if condition["type"] == "Succeeded")
+    status_data = _get_status_data(run)
     if not json:
         click.echo(_run_to_details_str(run=run, k8s_client=k8s_client))
     else:
@@ -541,9 +556,9 @@ def build_show(run_name: str, kubeconfig: Path, json: bool, **kwargs) -> None:
                         "repo_url": repo_url,
                     },
                     "status": {
-                        "succeeded": status["status"],
-                        "message": status["message"],
-                        "reason": status["reason"],
+                        "succeeded": status_data["status"],
+                        "message": status_data["message"],
+                        "reason": status_data["reason"],
                     },
                 },
                 indent=4,
