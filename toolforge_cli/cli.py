@@ -44,7 +44,10 @@ def _get_run_status(status_data: Dict[str, str]) -> str:
 def _get_status_data(run: Dict[str, Any]) -> Dict[str, str]:
     info = None
     if "status" in run:
-        info = next(info for info in run["status"]["conditions"] if info["type"] == "Succeeded")
+        info = next(
+            (info for info in run.get("status", {}).get("conditions", {}) if info.get("type") == "Succeeded"),
+            None,
+        )
 
     if info:
         start_time = run["status"]["startTime"]
