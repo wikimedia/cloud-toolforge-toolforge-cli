@@ -13,4 +13,3 @@ tar-ignore = *.pyo
 tar-ignore = __pycache__
 tar-ignore = .pytest_cache
 tar-ignore = .eggs
-

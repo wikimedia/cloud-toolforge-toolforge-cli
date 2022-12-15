@@ -22,7 +22,7 @@ Depends:
          tektoncd-cli,
          ${misc:Depends},
          ${python3:Depends}
-Description: Command line interface for Toolforge 
+Description: Command line interface for Toolforge
  This package contains the command line interface for Toolforge.
  .
  It provides the `toolforge` executable, which can be used to interact with the
