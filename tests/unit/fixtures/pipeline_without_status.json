@@ -62,6 +62,10 @@
         {
             "name": "GROUP_ID",
             "value": "61312"
+        },
+        {
+            "name": "SOURCE_REFERENCE",
+            "value": "upstream_buildpacks"
         }
         ],
         "pipelineRef": {

@@ -10,6 +10,7 @@ def pipeline_run_spec():
         source_url="http://dummy.source.url",
         builder_image="dummy-builder-image",
         username="dummy-username",
+        ref="dummy-ref",
     )
 
 

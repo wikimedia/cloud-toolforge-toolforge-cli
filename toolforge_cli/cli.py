@@ -8,7 +8,7 @@ import sys
 import time
 from functools import wraps
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 import click
 
@@ -69,7 +69,9 @@ def _get_run_data(run: Dict[str, Any]) -> Dict[str, Any]:
     repo_url, image_name, image_tag = _app_image_to_parts(app_image=app_image)
     builder_image = next(param for param in run["spec"]["params"] if param["name"] == "BUILDER_IMAGE")["value"]
     source_url = next(param for param in run["spec"]["params"] if param["name"] == "SOURCE_URL")["value"]
-
+    ref = next((param for param in run["spec"]["params"] if param["name"] == "SOURCE_REFERENCE"), {"value": "no ref"})[
+        "value"
+    ]
     status_data = _get_status_data(run)
     start_time = status_data["start_time"]
     end_time = status_data["end_time"]
@@ -82,6 +84,7 @@ def _get_run_data(run: Dict[str, Any]) -> Dict[str, Any]:
             "image_tag": image_tag,
             "repo_url": repo_url,
             "source_url": source_url,
+            "ref": ref,
             "builder_image": builder_image,
         },
         "start_time": start_time,
@@ -103,6 +106,7 @@ def _run_to_short_str(run_data: Dict[str, Any]) -> str:
     status = status_style.get(status_name, click.style(status_name, fg="yellow"))
     params = run_data["params"]
     source_url = params["source_url"]
+    ref = params["ref"]
     repo_url = params["repo_url"]
     image_name = params["image_name"]
     builder_image = params["builder_image"]
@@ -111,8 +115,8 @@ def _run_to_short_str(run_data: Dict[str, Any]) -> str:
     end_time = run_data["end_time"]
 
     return (
-        f"{run_name}\t{status}\t{start_time}\t{end_time}\t{source_url}\t{repo_url}\t{image_name}\t{image_tag}"
-        f"\t{builder_image}"
+        f"{run_name}\t{status}\t{start_time}\t{end_time}\t{source_url}\t{ref}\t{repo_url}\t{image_name}"
+        f"\t{image_tag}\t{builder_image}"
     )
 
 
@@ -246,8 +250,10 @@ def _run_to_details_str(run: Dict[str, Any], k8s_client: K8sAPIClient) -> str:
     repo_url, image_name, image_tag = _app_image_to_parts(app_image)
     builder_image = next(param for param in run["spec"]["params"] if param["name"] == "BUILDER_IMAGE")["value"]
     source_url = next(param for param in run["spec"]["params"] if param["name"] == "SOURCE_URL")["value"]
+    ref = next(param for param in run["spec"]["params"] if param["name"] == "SOURCE_REFERENCE")["value"]
     details_str += click.style("Parameters:\n", bold=True)
     details_str += f"    {click.style('source_url:', bold=True)} {source_url}\n"
+    details_str += f"    {click.style('ref:', bold=True)} {ref}\n"
     details_str += f"    {click.style('image_name:', bold=True)} {image_name}\n"
     details_str += f"    {click.style('image_tag:', bold=True)} {image_tag}\n"
     details_str += f"    {click.style('repo_url:', bold=True)} {repo_url}\n"
@@ -368,6 +374,11 @@ def build():
     default="harbor.tools.wmflabs.org",
     show_default=True,
 )
+@click.option(
+    "--ref",
+    help="Branch, tag or commit to build, by default will use the HEAD of the given repository.",
+    show_default=True,
+)
 @shared_build_options
 def build_start(
     dest_repository: str,
@@ -376,6 +387,7 @@ def build_start(
     image_tag: str,
     builder_image: str,
     kubeconfig: Path,
+    ref: Optional[str] = None,
     **kwargs,
 ) -> None:
 
@@ -384,7 +396,11 @@ def build_start(
         image_name=image_name, image_tag=image_tag, image_repository=dest_repository, user=k8s_client.user
     )
     pipeline_run_spec = get_pipeline_run_spec(
-        source_url=source_git_url, builder_image=builder_image, app_image=app_image, username=k8s_client.user
+        source_url=source_git_url,
+        builder_image=builder_image,
+        app_image=app_image,
+        username=k8s_client.user,
+        ref=ref,
     )
     response = k8s_client.create_object(kind="pipelineruns", spec=pipeline_run_spec)
     run_name = response["metadata"]["name"]
@@ -426,7 +442,10 @@ def build_list(kubeconfig: Path, json: bool, **kwargs) -> None:
     if not json:
         click.echo(
             click.style(
-                "run_name\tstatus\tstart_time\tend_time\tsource_url\trepo_url\timage_name\timage_tag\tbuilder_image",
+                (
+                    "run_name\tstatus\tstart_time\tend_time\tsource_url\tref\trepo_url\timage_name\timage_tag"
+                    "\tbuilder_image"
+                ),
                 bold=True,
             ),
         )

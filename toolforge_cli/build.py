@@ -1,5 +1,5 @@
 from copy import deepcopy
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 PIPELINE_RUN_SKELETON = {
     "apiVersion": "tekton.dev/v1beta1",
@@ -33,7 +33,9 @@ def get_app_image_url(
     return f"{image_repository}/{user}/{image_name}:{image_tag}"
 
 
-def get_pipeline_run_spec(app_image: str, source_url: str, builder_image: str, username: str) -> Dict[str, Any]:
+def get_pipeline_run_spec(
+    app_image: str, source_url: str, builder_image: str, username: str, ref: Optional[str]
+) -> Dict[str, Any]:
     # TODO: rethink if there's a better way of building this object, specially the hardcoded indices
     my_pipeline: Dict[str, Any] = deepcopy(PIPELINE_RUN_SKELETON)
     my_pipeline["metadata"]["generateName"] = f"{username}-buildpacks-pipelinerun-"
@@ -42,5 +44,12 @@ def get_pipeline_run_spec(app_image: str, source_url: str, builder_image: str, u
     my_pipeline["spec"]["params"][0]["value"] = builder_image
     my_pipeline["spec"]["params"][1]["value"] = app_image
     my_pipeline["spec"]["params"][2]["value"] = source_url
+    if ref:
+        my_pipeline["spec"]["params"] += [
+            {
+                "name": "SOURCE_REFERENCE",
+                "value": ref,
+            }
+        ]
 
     return my_pipeline
