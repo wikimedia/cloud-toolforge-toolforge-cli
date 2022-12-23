@@ -1,17 +1,14 @@
 import json
-import os
 from pathlib import Path
 from typing import Any, Dict
-from unittest.mock import MagicMock, Mock, call, patch
+from unittest.mock import Mock
 
 import pytest
 
 from toolforge_cli.cli import (
-    _add_discovered_subcommands,
     _get_run_data,
     _get_status_data,
     _get_task_details_lines,
-    toolforge,
 )
 
 FIXTURES_PATH = Path(__file__).parent / "fixtures"
@@ -166,57 +163,3 @@ def test__get_task_details_from_pipeline_run_without_steps(oom_pipeline_run):
         "",
     ]
     assert actual == expected
-
-
-def test_add_discovered_subcommands_returns_the_passed_cli():
-    mycommand = Mock(spec=toolforge)
-    with patch.dict(os.environ, {"PATH": str(FIXTURES_PATH)}):
-        result = _add_discovered_subcommands(cli=mycommand)
-
-    assert result is mycommand
-
-
-def test_add_discovered_subcommands_finds_single_binary_in_path():
-    mycommand = MagicMock(spec=toolforge)
-    with patch.dict(os.environ, {"PATH": str(FIXTURES_PATH / "single_binary")}):
-        _add_discovered_subcommands(cli=mycommand)
-
-    mycommand.command.assert_called_once_with(name="binary", context_settings={"ignore_unknown_options": True})
-
-
-def test_add_discovered_subcommands_finds_multiple_binaries_in_path():
-    mycommand = MagicMock(spec=toolforge)
-    with patch.dict(os.environ, {"PATH": str(FIXTURES_PATH / "multiple_binaries")}):
-        _add_discovered_subcommands(cli=mycommand)
-
-    mycommand.command.assert_has_calls(
-        calls=[
-            call(name="one", context_settings={"ignore_unknown_options": True}),
-            call(name="two", context_settings={"ignore_unknown_options": True}),
-        ],
-        any_order=True,
-    )
-
-
-def test_add_discovered_subcommands_finds_nested_binaries_in_path():
-    mycommand = MagicMock(spec=toolforge)
-    with patch.dict(
-        os.environ, {"PATH": f"{FIXTURES_PATH / 'nested_binaries'}:{FIXTURES_PATH / 'nested_binaries' / 'nested_dir'}"}
-    ):
-        _add_discovered_subcommands(cli=mycommand)
-
-    mycommand.command.assert_has_calls(
-        calls=[
-            call(name="nested", context_settings={"ignore_unknown_options": True}),
-            call(name="simple", context_settings={"ignore_unknown_options": True}),
-        ],
-        any_order=True,
-    )
-
-
-def test_add_discovered_subcommands_finds_mixed_files_in_path():
-    mycommand = MagicMock(spec=toolforge)
-    with patch.dict(os.environ, {"PATH": str(FIXTURES_PATH / "mixed_files")}):
-        _add_discovered_subcommands(cli=mycommand)
-
-    mycommand.command.assert_called_once_with(name="plugin", context_settings={"ignore_unknown_options": True})
