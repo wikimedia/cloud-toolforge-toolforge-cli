@@ -347,7 +347,7 @@ def build():
 
 
 @build.command(name="start", help="Start a pipeline to build a container image from source code")
-@click.argument("SOURCE_GIT_URL")
+@click.argument("SOURCE_GIT_URL", required=False)
 @click.option(
     "-n",
     "--image-name",
@@ -390,6 +390,13 @@ def build_start(
     ref: Optional[str] = None,
     **kwargs,
 ) -> None:
+
+    if not source_git_url:
+        message = (f"{click.style('Error:', bold=True, fg='red')} Please provide a git url for your source code.\n" +
+                   f"{click.style('Example:', bold=True)}" +
+                   " toolforge build start 'https://gitlab.wikimedia.org/toolforge-repos/my-tool'")
+        click.echo(message)
+        return
 
     k8s_client = K8sAPIClient.from_file(kubeconfig=kubeconfig, namespace=TBS_NAMESPACE)
     app_image = get_app_image_url(
