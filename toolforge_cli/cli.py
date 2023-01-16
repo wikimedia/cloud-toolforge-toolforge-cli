@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 import click
+from requests.exceptions import ConnectionError
 
 from toolforge_cli.build import get_app_image_url, get_pipeline_run_spec
 from toolforge_cli.k8sclient import K8sAPIClient
@@ -402,11 +403,16 @@ def build_start(
         username=k8s_client.user,
         ref=ref,
     )
-    response = k8s_client.create_object(kind="pipelineruns", spec=pipeline_run_spec)
-    run_name = response["metadata"]["name"]
-    click.echo(
-        f"Building '{source_git_url}' -> '{app_image}'\nYou can see the logs with:\n\ttoolforge build logs '{run_name}'"
-    )
+    try:
+        response = k8s_client.create_object(kind="pipelineruns", spec=pipeline_run_spec)
+        run_name = response["metadata"]["name"]
+        message = (f"Building '{source_git_url}' -> '{app_image}'\n" +
+                   f"You can see the logs with:\n\ttoolforge build logs '{run_name}'")
+    except ConnectionError:
+        message = ("The build service seems to be down – please retry in a few minutes.\nIf the problem persists, " +
+                   "please contact us or open a bug:\n<link to the contact/bug page, see T324822>")
+
+    click.echo(message)
 
 
 @build.command(name="logs", help="Show the logs for a build (only admins for now)")
