@@ -2,7 +2,6 @@
 import json as json_mod
 import logging
 import os
-import pwd
 import subprocess
 import sys
 import time
@@ -334,6 +333,11 @@ def shared_build_options(func: Callable) -> Callable:
     return wrapper
 
 
+def generate_default_image_name() -> str:
+    project_name = str(Path().absolute()).split('/')[-1]
+    return f"{project_name}/{project_name}"
+
+
 @click.version_option()
 @click.group(name="toolforge", help="Toolforge command line")
 @click.option("-v", "--verbose", help="Show extra verbose output", is_flag=True)
@@ -352,7 +356,7 @@ def build():
     "-n",
     "--image-name",
     help="Image identifier for the builder that will be used to build the project (ex. python)",
-    default=pwd.getpwuid(os.getuid()).pw_name,
+    default=generate_default_image_name(),
     show_default=True,
 )
 @click.option(
