@@ -12,13 +12,21 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 import click
 from requests.exceptions import ConnectionError
 
-from toolforge_cli.build import get_app_image_url, get_pipeline_run_spec
+import toolforge_cli.build as toolforge_build
 from toolforge_cli.k8sclient import K8sAPIClient
 
 TOOLFORGE_PREFIX = "toolforge-"
 TBS_NAMESPACE = "image-build"
 ADMIN_GROUP_NAMES = ["admins", "system:masters"]
 LOGGER = logging.getLogger("toolforge" if __name__ == "__main__" else __name__)
+
+
+def _execute_k8s_client_method(method, kwargs: Dict[str, Any]):
+    try:
+        return method(**kwargs)
+    except ConnectionError:
+        click.echo(click.style(toolforge_build.SERVICE_DOWN_ERROR_STR, fg="red", bold=True))
+        sys.exit(1)
 
 
 def _run_is_ok(status_data: Dict[str, Any]) -> bool:
@@ -395,7 +403,6 @@ def build_start(
     ref: Optional[str] = None,
     **kwargs,
 ) -> None:
-
     if not source_git_url:
         message = (f"{click.style('Error:', bold=True, fg='red')} Please provide a git url for your source code.\n" +
                    f"{click.style('Example:', bold=True)}" +
@@ -404,25 +411,27 @@ def build_start(
         return
 
     k8s_client = K8sAPIClient.from_file(kubeconfig=kubeconfig, namespace=TBS_NAMESPACE)
-    app_image = get_app_image_url(
+    app_image = toolforge_build.get_app_image_url(
         image_name=image_name, image_tag=image_tag, image_repository=dest_repository, user=k8s_client.user
     )
-    pipeline_run_spec = get_pipeline_run_spec(
+    pipeline_run_spec = toolforge_build.get_pipeline_run_spec(
         source_url=source_git_url,
         builder_image=builder_image,
         app_image=app_image,
         username=k8s_client.user,
         ref=ref,
     )
-    try:
-        response = k8s_client.create_object(kind="pipelineruns", spec=pipeline_run_spec)
-        run_name = response["metadata"]["name"]
-        message = (f"Building '{source_git_url}' -> '{app_image}'\n" +
-                   f"You can see the logs with:\n\ttoolforge build logs '{run_name}'")
-    except ConnectionError:
-        message = ("The build service seems to be down – please retry in a few minutes.\nIf the problem persists, " +
-                   "please contact us or open a bug:\n<link to the contact/bug page, see T324822>")
 
+    method_kwargs = {
+        "kind": "pipelineruns",
+        "spec": pipeline_run_spec
+    }
+    response = _execute_k8s_client_method(method=k8s_client.create_object, kwargs=method_kwargs)
+    run_name = response["metadata"]["name"]
+    message = (
+        f"Building '{source_git_url}' -> '{app_image}'\n" +
+        f"You can see the logs with:\n\ttoolforge build logs '{run_name}'"
+    )
     click.echo(message)
 
 
@@ -454,7 +463,11 @@ def build_logs(run_name: str, kubeconfig: Path, **kwargs) -> None:
 @shared_build_options
 def build_list(kubeconfig: Path, json: bool, **kwargs) -> None:
     k8s_client = K8sAPIClient.from_file(kubeconfig=kubeconfig, namespace=TBS_NAMESPACE)
-    runs = k8s_client.get_objects(kind="pipelineruns", selector=f"user={k8s_client.user}")
+    method_kwargs = {
+        "kind": "pipelineruns",
+        "selector": f"user={k8s_client.user}"
+    }
+    runs = _execute_k8s_client_method(method=k8s_client.get_objects, kwargs=method_kwargs)
 
     if not json:
         click.echo(
@@ -494,12 +507,16 @@ def build_list(kubeconfig: Path, json: bool, **kwargs) -> None:
 )
 @shared_build_options
 def build_cancel(kubeconfig: Path, build_name: List[str], all: bool, yes_i_know: bool, **kwargs) -> None:
-    k8s_client = K8sAPIClient.from_file(kubeconfig=kubeconfig, namespace=TBS_NAMESPACE)
-    all_user_runs = k8s_client.get_objects(kind="pipelineruns", selector=f"user={k8s_client.user}")
-
     if not build_name and not all:
         click.echo("No run passed to cancel.")
         return
+
+    k8s_client = K8sAPIClient.from_file(kubeconfig=kubeconfig, namespace=TBS_NAMESPACE)
+    kwargs = {
+        "kind": "pipelineruns",
+        "selector": f"user={k8s_client.user}"
+    }
+    all_user_runs = _execute_k8s_client_method(k8s_client.get_objects, kwargs)
 
     runs_to_cancel = []
     for run in all_user_runs:
@@ -542,12 +559,16 @@ def build_cancel(kubeconfig: Path, build_name: List[str], all: bool, yes_i_know:
 )
 @shared_build_options
 def build_delete(kubeconfig: Path, build_name: List[str], all: bool, yes_i_know: bool, **kwargs) -> None:
-    k8s_client = K8sAPIClient.from_file(kubeconfig=kubeconfig, namespace=TBS_NAMESPACE)
-    all_user_runs = k8s_client.get_objects(kind="pipelineruns", selector=f"user={k8s_client.user}")
-
     if not build_name and not all:
         click.echo("No run passed to delete")
         return
+
+    k8s_client = K8sAPIClient.from_file(kubeconfig=kubeconfig, namespace=TBS_NAMESPACE)
+    method_kwargs = {
+        "kind": "pipelineruns",
+        "selector": f"user={k8s_client.user}"
+    }
+    all_user_runs = _execute_k8s_client_method(method=k8s_client.get_objects, kwargs=method_kwargs)
 
     runs_to_delete = []
     for run in all_user_runs:
@@ -578,7 +599,11 @@ def build_delete(kubeconfig: Path, build_name: List[str], all: bool, yes_i_know:
 @shared_build_options
 def build_show(run_name: str, kubeconfig: Path, json: bool, **kwargs) -> None:
     k8s_client = K8sAPIClient.from_file(kubeconfig=kubeconfig, namespace=TBS_NAMESPACE)
-    run = k8s_client.get_object(kind="pipelineruns", name=run_name)
+    method_kwargs = {
+        "kind": "pipelineruns",
+        "name": run_name
+    }
+    run = _execute_k8s_client_method(method=k8s_client.get_object, kwargs=method_kwargs)
     app_image = next(param for param in run["spec"]["params"] if param["name"] == "APP_IMAGE")["value"]
     repo_url, image_name, image_tag = _app_image_to_parts(app_image=app_image)
     status_data = _get_status_data(run)
