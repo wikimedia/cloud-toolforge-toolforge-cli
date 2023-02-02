@@ -15,11 +15,8 @@ trap restore_user EXIT
 
 export DEBIAN_FRONTEND noninteractive
 cd /src
-# this build a deb package with the dependencies we need to install
-mk-build-deps debian/control
-apt install -y ./toolforge-cli-build-deps_*_all.deb -t bullseye-backports
-# cleanup build deps package
-rm *.deb *.changes *.buildinfo
+
+apt-get build-dep -y -t bullseye-backports .
 
 debuild -uc -us
 
