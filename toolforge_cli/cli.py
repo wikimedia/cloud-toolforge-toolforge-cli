@@ -280,10 +280,15 @@ def _app_image_to_parts(app_image: str) -> Tuple[str, str, str]:
     return (repo, image_name, tag)
 
 
-def _run_external_command(*args, binary: str) -> None:
+def _run_external_command(*args, binary: str, verbose: bool = False) -> None:
+    env = os.environ.copy()
     cmd = [binary, *args]
+    env["TOOLFORGE_DEBUG"] = "1" if verbose else "0"
+
     LOGGER.debug(f"Running command: {cmd}")
-    proc = subprocess.Popen(args=cmd, bufsize=0, stdin=sys.stdin, stdout=sys.stdout, stderr=sys.stderr, shell=False)
+    proc = subprocess.Popen(
+        args=cmd, bufsize=0, stdin=sys.stdin, stdout=sys.stdout, stderr=sys.stderr, shell=False, env=env
+    )
     returncode = proc.poll()
     while returncode is None:
         time.sleep(0.1)
@@ -318,10 +323,12 @@ def _add_discovered_subcommands(cli: click.Group) -> click.Group:
         )
         @click.option("--help", is_flag=True, default=False)
         @click.argument("args", nargs=-1, type=click.UNPROCESSED)
-        def _new_command(args, help: bool, bin_path: str = bin_path):  # noqa
+        @click.pass_context
+        def _new_command(ctx, args, help: bool, bin_path: str = bin_path):  # noqa
+            verbose = ctx.obj.get("verbose", False)
             if help:
                 args = ["--help"] + list(args)
-            _run_external_command(*args, binary=bin_path)
+            _run_external_command(*args, verbose=verbose, binary=bin_path)
 
     return cli
 
@@ -334,7 +341,6 @@ def shared_build_options(func: Callable) -> Callable:
         type=Path,
         show_default=True,
     )
-    @click.option("-v", "--verbose", help="Show extra verbose output", is_flag=True)
     @wraps(func)
     def wrapper(*args, **kwargs) -> Callable:
         return func(*args, **kwargs)
@@ -350,7 +356,10 @@ def generate_default_image_name() -> str:
 @click.version_option()
 @click.group(name="toolforge", help="Toolforge command line")
 @click.option("-v", "--verbose", help="Show extra verbose output", is_flag=True)
-def toolforge(verbose: bool) -> None:
+@click.pass_context
+def toolforge(ctx: click.Context, verbose: bool) -> None:
+    ctx.ensure_object(dict)
+    ctx.obj['verbose'] = verbose
     pass
 
 
@@ -401,7 +410,6 @@ def build_start(
     builder_image: str,
     kubeconfig: Path,
     ref: Optional[str] = None,
-    **kwargs,
 ) -> None:
     if not source_git_url:
         message = (f"{click.style('Error:', bold=True, fg='red')} Please provide a git url for your source code.\n" +
@@ -438,7 +446,7 @@ def build_start(
 @build.command(name="logs", help="Show the logs for a build (only admins for now)")
 @click.argument("RUN_NAME")
 @shared_build_options
-def build_logs(run_name: str, kubeconfig: Path, **kwargs) -> None:
+def build_logs(run_name: str, kubeconfig: Path) -> None:
     k8s_client = K8sAPIClient.from_file(kubeconfig=kubeconfig, namespace=TBS_NAMESPACE)
 
     if k8s_client.org_name in ADMIN_GROUP_NAMES:
@@ -461,7 +469,7 @@ def build_logs(run_name: str, kubeconfig: Path, **kwargs) -> None:
     is_flag=True,
 )
 @shared_build_options
-def build_list(kubeconfig: Path, json: bool, **kwargs) -> None:
+def build_list(kubeconfig: Path, json: bool) -> None:
     k8s_client = K8sAPIClient.from_file(kubeconfig=kubeconfig, namespace=TBS_NAMESPACE)
     method_kwargs = {
         "kind": "pipelineruns",
@@ -489,7 +497,6 @@ def build_list(kubeconfig: Path, json: bool, **kwargs) -> None:
 
 
 @build.command(name="cancel", help="Cancel a running build (does nothing for stopped ones)")
-@click.option("-v", "--verbose", help="Show extra verbose output", is_flag=True)
 @click.option(
     "--all",
     help="Cancel all the current builds.",
@@ -506,7 +513,7 @@ def build_list(kubeconfig: Path, json: bool, **kwargs) -> None:
     nargs=-1,
 )
 @shared_build_options
-def build_cancel(kubeconfig: Path, build_name: List[str], all: bool, yes_i_know: bool, **kwargs) -> None:
+def build_cancel(kubeconfig: Path, build_name: List[str], all: bool, yes_i_know: bool) -> None:
     if not build_name and not all:
         click.echo("No run passed to cancel.")
         return
@@ -558,7 +565,7 @@ def build_cancel(kubeconfig: Path, build_name: List[str], all: bool, yes_i_know:
     nargs=-1,
 )
 @shared_build_options
-def build_delete(kubeconfig: Path, build_name: List[str], all: bool, yes_i_know: bool, **kwargs) -> None:
+def build_delete(kubeconfig: Path, build_name: List[str], all: bool, yes_i_know: bool) -> None:
     if not build_name and not all:
         click.echo("No run passed to delete")
         return
@@ -597,7 +604,7 @@ def build_delete(kubeconfig: Path, build_name: List[str], all: bool, yes_i_know:
     is_flag=True,
 )
 @shared_build_options
-def build_show(run_name: str, kubeconfig: Path, json: bool, **kwargs) -> None:
+def build_show(run_name: str, kubeconfig: Path, json: bool) -> None:
     k8s_client = K8sAPIClient.from_file(kubeconfig=kubeconfig, namespace=TBS_NAMESPACE)
     method_kwargs = {
         "kind": "pipelineruns",

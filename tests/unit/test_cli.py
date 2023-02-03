@@ -5,11 +5,13 @@ from unittest.mock import Mock
 
 import pytest
 
+
 from toolforge_cli.cli import (
     _get_run_data,
     _get_status_data,
-    _get_task_details_lines,
+    _get_task_details_lines
 )
+
 
 FIXTURES_PATH = Path(__file__).parent / "fixtures"
 
