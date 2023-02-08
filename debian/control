@@ -7,7 +7,7 @@ Build-Depends: debhelper-compat (= 12),
                dh-python,
                python3-all,
                python3-setuptools,
-               python3-poetry-core,
+               python3-poetry-core (>= 1.4),
                python3-cachecontrol,
                pybuild-plugin-pyproject
 Standards-Version: 4.5.1

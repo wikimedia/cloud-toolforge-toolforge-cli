@@ -16,7 +16,14 @@ trap restore_user EXIT
 export DEBIAN_FRONTEND noninteractive
 cd /src
 
-apt-get build-dep -y -t bullseye-backports .
+# poetry-core is here because build-dep does not pull it coming from a different repo it seems
+apt install -y python3-poetry-core
+
+apt-get \
+    build-dep \
+    --yes \
+    --target-release bullseye-backports \
+    .
 
 debuild -uc -us
 
