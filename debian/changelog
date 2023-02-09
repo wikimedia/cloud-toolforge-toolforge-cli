@@ -1,3 +1,44 @@
+toolforge-cli (0.2.3) buster; urgency=medium
+
+  [ David Caro ]
+  * [9dcc09f] Fix version in pyproject
+
+  [ Slavina Stefanova ]
+  * [2dbe905] cli: Pass through flags to external subcommands
+  * [0eff98f] cli: Do not crash on external subcommand failure
+  * [110a438] cli: Create nested subcommands
+
+  [ Raymond Ndibe ]
+  * [963752c] toolforge-cli: show better messaging if the pipelinerun has no 'status'
+  * [da99d5f] toolforge-cli: show better messaging if the pipelinerun has no 'status'
+
+  [ Slavina Stefanova ]
+  * [4527aba] dev: Use pre-commit for code-quality checks
+
+  [ David Caro ]
+  * [420b064] tox: Allow passing args to pre-commit to select hook
+  * [1e9a22c] tests: replaced some tests with functional ones
+  * [7108640] tox: remove unnecessary format environment
+  * [50db5bb] cli: add --ref option to specify branch/tag/commit
+
+  [ Slavina Stefanova ]
+  * [251350d] cli: Display helpful error message when the service is down
+  * [665478b] cli: Autogenerate image name when not passed
+  * [7fe99d5] cli: Display helpful error msg when the git url is not passed
+
+  [ Raymond Ndibe ]
+  * [5138da2] toolforge-cli: better error message when build service is down
+
+  [ Taavi Väänänen ]
+  * [d368acd] debuilder: Use `apt-get build-dep`
+
+  [ David Caro ]
+  * [9c82861] Use backported poetry package
+  * [55b2ae4] Upgrade pre-commit hooks, using latest isort 5.11.*
+  * [1879ed7] Bump version to 0.2.3 and add changelog script
+
+ -- David Caro <dcaro@wikimedia.org>  Mon, 13 Feb 2023 13:05:29 +0000
+
 toolforge-cli (0.2.2) buster; urgency=low
 
   * Fixed subcommand discovery

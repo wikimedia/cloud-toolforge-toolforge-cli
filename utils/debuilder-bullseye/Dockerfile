@@ -7,7 +7,12 @@ RUN apt update -y \
 
 COPY toolforge.list /etc/apt/sources.list.d/
 
+# git-buildpackage is to be able to generate the changelog
 RUN apt update -y \
-    && apt install -y devscripts
+    && apt install -y \
+        devscripts \
+        git-buildpackage
+
 COPY entrypoint.sh /entrypoint.sh
+COPY generate_changelog.sh /generate_changelog.sh
 ENTRYPOINT ["/entrypoint.sh"]

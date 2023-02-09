@@ -29,6 +29,24 @@ That will run the tests and create a virtualenv that you can use to manually deb
 ```
 
 ## Building the debian packages
+### Incrementing the version and creating a changelog
+To do so, you can run the scrip:
+```
+~:$ utils/bump_version.sh
+```
+
+That will:
+
+* create an entry in debian/changelog from the git log since the last debian/* tag
+* bump the version in pyproject too
+
+It does not create a 'debian/$version' tag nor upload for you or send the new patch.
+
+
+After this, you have to send the new changes for review, once approved, you have to create the tag and build, upload
+and release the package.
+
+
 ### Using docker
 This is the recommended way of building the packages, as it's agnostic of the OS/distro you are using.
 
