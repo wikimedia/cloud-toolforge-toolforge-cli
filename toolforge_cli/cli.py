@@ -258,7 +258,9 @@ def _run_to_details_str(run: Dict[str, Any], k8s_client: K8sAPIClient) -> str:
     repo_url, image_name, image_tag = _app_image_to_parts(app_image)
     builder_image = next(param for param in run["spec"]["params"] if param["name"] == "BUILDER_IMAGE")["value"]
     source_url = next(param for param in run["spec"]["params"] if param["name"] == "SOURCE_URL")["value"]
-    ref = next(param for param in run["spec"]["params"] if param["name"] == "SOURCE_REFERENCE")["value"]
+    ref = next((param for param in run["spec"]["params"] if param["name"] == "SOURCE_REFERENCE"), {"value": "no ref"})[
+        "value"
+    ]
     details_str += click.style("Parameters:\n", bold=True)
     details_str += f"    {click.style('source_url:', bold=True)} {source_url}\n"
     details_str += f"    {click.style('ref:', bold=True)} {ref}\n"
