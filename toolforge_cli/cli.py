@@ -592,7 +592,7 @@ def build_delete(kubeconfig: Path, build_name: List[str], all: bool, yes_i_know:
 
 
 @build.command(name="show", help="Show details for a specific build")
-@click.argument("RUN_NAME")
+@click.argument("RUN_NAME", required=False)
 @click.option(
     "--json",
     help="If set, will output in json format",
@@ -602,10 +602,27 @@ def build_delete(kubeconfig: Path, build_name: List[str], all: bool, yes_i_know:
 def build_show(run_name: str, kubeconfig: Path, json: bool, **kwargs) -> None:
     k8s_client = K8sAPIClient.from_file(kubeconfig=kubeconfig, namespace=TBS_NAMESPACE)
     method_kwargs = {
-        "kind": "pipelineruns",
-        "name": run_name
+        "kind": "pipelineruns"
     }
-    run = _execute_k8s_client_method(method=k8s_client.get_object, kwargs=method_kwargs)
+    if run_name:
+        method_kwargs["name"] = run_name
+        run = _execute_k8s_client_method(method=k8s_client.get_object, kwargs=method_kwargs)
+    else:
+        method_kwargs["selector"] = f"user={k8s_client.user}"
+        runs = _execute_k8s_client_method(method=k8s_client.get_objects, kwargs=method_kwargs)
+        runs = sorted(runs, key=lambda run: run["metadata"]["creationTimestamp"], reverse=True)
+        run = runs[0] if len(runs) > 0 else None
+
+    if not run:
+        click.echo(click.style(
+            (
+                "No builds found, you can start one using `toolforge build start`," +
+                "run `toolforge build start --help` for more details"
+            ),
+            fg="yellow"
+        ))
+        return
+
     app_image = next(param for param in run["spec"]["params"] if param["name"] == "APP_IMAGE")["value"]
     repo_url, image_name, image_tag = _app_image_to_parts(app_image=app_image)
     status_data = _get_status_data(run)
