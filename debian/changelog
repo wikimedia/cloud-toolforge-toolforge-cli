@@ -1,3 +1,10 @@
+toolforge-cli (0.2.4) buster; urgency=medium
+
+  [ Raymond Ndibe ]
+  * [8d44df3] toolforge-cli: fix bug when running toolforge build show <build id>
+
+ -- David Caro <dcaro@wikimedia.org>  Tue, 28 Feb 2023 14:16:21 +0000
+
 toolforge-cli (0.2.3) buster; urgency=medium
 
   [ David Caro ]
