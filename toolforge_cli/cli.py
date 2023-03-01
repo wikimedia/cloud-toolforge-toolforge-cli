@@ -345,8 +345,12 @@ def shared_build_options(func: Callable) -> Callable:
 
 
 def generate_default_image_name() -> str:
-    project_name = str(Path().absolute()).split('/')[-1]
-    return f"{project_name}/{project_name}"
+    """Get the default project.
+
+    Currently that matches the tool account name, and the unix user, we might want to change the way we detect that
+    once we have a public API.
+    """
+    return Path("~").expanduser().absolute().name
 
 
 @click.version_option()
