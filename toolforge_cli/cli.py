@@ -432,7 +432,7 @@ def build_start(
     run_name = response["metadata"]["name"]
     message = (
         f"Building '{source_git_url}' -> '{app_image}'\n" +
-        f"You can see the logs with:\n\ttoolforge build logs '{run_name}'"
+        f"You can see the status with:\n\ttoolforge build show '{run_name}'"
     )
     click.echo(message)
 
