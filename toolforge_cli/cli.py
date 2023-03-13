@@ -384,7 +384,7 @@ def build():
 @click.option(
     "--builder-image",
     help="This is the image identifier for the buildpack builder, without protocol (no http/https)",
-    default="docker-registry.tools.wmflabs.org/toolforge-bullseye0-builder:latest",
+    default="harbor-tools.wmflabs.org/toolforge/heroku-builder-classic:22",
     show_default=True,
 )
 @click.option(
