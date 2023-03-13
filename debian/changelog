@@ -1,3 +1,17 @@
+toolforge-cli (0.2.5) buster; urgency=medium
+
+  [ David Caro ]
+  * [f6eedcb] build: add tag to builder image
+  * [701e11c] cli.build: suggest using `show` instead of `logs`
+
+  [ Raymond Ndibe ]
+  * [6730289] toolforge-cli: show should default to latest build when no build id
+
+  [ David Caro ]
+  * [4172e38] cli: Fix the default image name
+
+ -- David Caro <dcaro@wikimedia.org>  Mon, 13 Mar 2023 09:37:45 +0000
+
 toolforge-cli (0.2.4) buster; urgency=medium
 
   [ Raymond Ndibe ]
