@@ -1,3 +1,10 @@
+toolforge-cli (0.2.6) buster; urgency=medium
+
+  [ David Caro ]
+  * [28a4d88] cli: add builder tag to cli default
+
+ -- Slavina Stefanova <sstefanova@wikimedia.org>  Mon, 13 Mar 2023 13:40:39 +0000
+
 toolforge-cli (0.2.5) buster; urgency=medium
 
   [ David Caro ]
