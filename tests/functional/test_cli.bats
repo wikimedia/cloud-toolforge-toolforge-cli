@@ -94,3 +94,22 @@ bats_require_minimum_version 1.5.0
     [[ "$status" == "0" ]]
     [[ "$output" == "toolforge-params: -h one two --other=one" ]]
 }
+
+@test "TOOLFORGE_DEBUG env variable is being set correctly" {
+    export PATH=$BATS_TEST_DIRNAME/fixtures/echo_verbose_env:$PATH
+
+    run toolforge --help
+
+    [[ "$status" == "0" ]]
+    [[ "$output" =~ .*^\ *verbose-env ]]
+
+    run toolforge verbose-env
+
+    [[ "$status" == "0" ]]
+    [[ "$output" =~ "toolforge-verbose: 0" ]]
+
+    run toolforge --verbose verbose-env
+
+    [[ "$status" == "0" ]]
+    [[ "$output" =~ "toolforge-verbose: 1" ]]
+}
