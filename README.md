@@ -9,11 +9,11 @@ CLI to run toolforge related commands
 You need to have [Poetry](https://github.com/python-poetry/poetry) installed globally. While you can install it with package managers such as `pip` or `homebrew`, it's highly recommended to use the official installer:
 https://python-poetry.org/docs/#installing-with-the-official-installer
 
-### Tox on debian testing
+### Testing with tox on debian
 
 Clone the repo including commit hooks (instructions here https://gerrit.wikimedia.org/r/admin/repos/cloud/toolforge/toolforge-cli).
 
-Install tox:
+Install tox (this is the only debian-specific part):
 ```
 ~:$ apt install tox
 ```
@@ -29,7 +29,18 @@ That will run the tests and create a virtualenv that you can use to manually deb
 ```
 
 ## Building the debian packages
-### Incrementing the version and creating a changelog
+
+The process will be:
+* Bump the version
+  * Update the `debian/changelog` and `pyproject.toml` (done by `bump_version.sh`)
+  * Create a patch, get it reviewed and merged
+* Create a tag (`debian/<new_version>`) and push
+* Build the package (done by `build_deb.sh`)
+* Upload the package to the toolforge repositories
+
+Let's get started!
+
+### Update the changelog and pyproject.toml
 To do so, you can run the scrip:
 ```
 ~:$ utils/bump_version.sh
@@ -37,20 +48,32 @@ To do so, you can run the scrip:
 
 That will:
 
-* create an entry in debian/changelog from the git log since the last debian/* tag
-* bump the version in pyproject too
+* create an entry in `debian/changelog` from the git log since the last `debian/*` tag
+* bump the version in `pyproject.toml` too
 
-It does not create a 'debian/$version' tag nor upload for you or send the new patch.
+At this point, you should create a commit and send it for review, and continue once merged.
 
+```
+~:$  git commit -m "Bumped version to <new_version>" --sign-off
+~:$  git review  # if you have https://opendev.org/opendev/git-review installed
+```
 
-After this, you have to send the new changes for review, once approved, you have to create the tag and build, upload
-and release the package.
+### Get the version bump commit merged
 
+Review the `changelog` and the `pyproject.toml` changes to make sure it's what you want (it uses your name, email, etc.), and ask
+for reviews.
 
-### Using docker
-This is the recommended way of building the packages, as it's agnostic of the OS/distro you are using.
+### Create and upload the debian tag
+
+Once merged, you can create a tag named `debian/<new_version>` locally and push it to the repository (ex. `git push gerrit debian/<new_version>`).
+
+### Build the package
+#### With containers
+This is the recommended way of building the package, as it's agnostic of the OS/distro you are using.
 
 It will not allow you to sign your package though, so if you need that try using the manual process.
+
+Now you can build the package with:
 
 ```
 ~:$ utils/build_deb.sh
@@ -59,7 +82,9 @@ It will not allow you to sign your package though, so if you need that try using
 The first time it might take a bit more time as it will build the core image to build packages, downloading many
 dependencies. The next run it will not need to download all those dependencies, so it will be way faster.
 
-### Manual process
+**NOTE**: If it failed when installing packages, try passing `--no-cache` to force rebuilding the cached layers.
+
+#### Manual process (only on debian)
 For this you'll need debuild installed:
 ```
 ~:$ sudo apt install debuild
