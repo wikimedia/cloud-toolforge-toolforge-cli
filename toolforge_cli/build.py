@@ -1,10 +1,17 @@
 from copy import deepcopy
 from typing import Any, Dict, Optional
 
-SERVICE_DOWN_ERROR_STR = (
-    "The build service seems to be down – please retry in a few minutes.\nIf the problem persists, " +
-    "please contact us or open a bug:\nsee https://phabricator.wikimedia.org/T324822"
-)
+ERROR_STRINGS = {
+    "SERVICE_DOWN_ERROR": (
+        "The build service seems to be down – please retry in a few minutes.\nIf the problem persists, " +
+        "please contact us or open a bug:\nsee https://phabricator.wikimedia.org/T324822"
+    ),
+    "UNKOWN_ERROR": (
+        "An unknown error occured while trying to perform this operation.\nIf the problem persists, " +
+        "please contact us or open a bug:\nsee https://phabricator.wikimedia.org/T324822"
+
+    )
+}
 
 PIPELINE_RUN_SKELETON = {
     "apiVersion": "tekton.dev/v1beta1",

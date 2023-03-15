@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 import click
-from requests.exceptions import ConnectionError
+from requests.exceptions import ConnectionError, HTTPError
 
 import toolforge_cli.build as toolforge_build
 from toolforge_cli.k8sclient import K8sAPIClient
@@ -25,8 +25,10 @@ def _execute_k8s_client_method(method, kwargs: Dict[str, Any]):
     try:
         return method(**kwargs)
     except ConnectionError:
-        click.echo(click.style(toolforge_build.SERVICE_DOWN_ERROR_STR, fg="red", bold=True))
-        sys.exit(1)
+        click.echo(click.style(toolforge_build.ERROR_STRINGS["SERVICE_DOWN_ERROR"], fg="red", bold=True))
+    except HTTPError:
+        click.echo(click.style(toolforge_build.ERROR_STRINGS["UNKOWN_ERROR"], fg="red", bold=True))
+    sys.exit(1)
 
 
 def _run_is_ok(status_data: Dict[str, Any]) -> bool:
@@ -545,11 +547,12 @@ def build_cancel(kubeconfig: Path, build_name: List[str], all: bool, yes_i_know:
 
     for run in runs_to_cancel:
         # see https://tekton.dev/docs/pipelines/pipelineruns/#cancelling-a-pipelinerun
-        k8s_client.patch_object(
-            kind="pipelineruns",
-            name=run["metadata"]["name"],
-            json_patches=[{"op": "add", "path": "/spec/status", "value": "PipelineRunCancelled"}],
-        )
+        run_kwargs = {
+            "kind": "pipelineruns",
+            "name": run["metadata"]["name"],
+            "json_patches": [{"op": "add", "path": "/spec/status", "value": "PipelineRunCancelled"}]
+        }
+        _execute_k8s_client_method(k8s_client.patch_object, run_kwargs)
 
     click.echo(f"Cancelled {len(runs_to_cancel)} runs")
 
