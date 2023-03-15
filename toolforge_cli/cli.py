@@ -545,6 +545,7 @@ def build_cancel(kubeconfig: Path, build_name: List[str], all: bool, yes_i_know:
     if not yes_i_know:
         click.confirm(f"I'm going to cancel {len(runs_to_cancel)} runs, continue?", abort=True)
 
+    runs_to_cancel_count = len(runs_to_cancel)
     for run in runs_to_cancel:
         # see https://tekton.dev/docs/pipelines/pipelineruns/#cancelling-a-pipelinerun
         run_kwargs = {
@@ -552,9 +553,25 @@ def build_cancel(kubeconfig: Path, build_name: List[str], all: bool, yes_i_know:
             "name": run["metadata"]["name"],
             "json_patches": [{"op": "add", "path": "/spec/status", "value": "PipelineRunCancelled"}]
         }
-        _execute_k8s_client_method(k8s_client.patch_object, run_kwargs)
-
-    click.echo(f"Cancelled {len(runs_to_cancel)} runs")
+        # We rely on patch never returning some kind of error dictionary when canceling the
+        # pipelinerun no matter it's state, this might change in the future
+        result = _execute_k8s_client_method(k8s_client.patch_object, run_kwargs)
+        status_data = _get_status_data(result)
+        if status_data["reason"].lower() in ["failed", "succeeded"]:
+            click.echo(click.style(
+                f"{result['metadata']['name']} cannot be cancelled because it has already completed",
+                fg="yellow",
+                bold=True,
+            ))
+            runs_to_cancel_count -= 1
+        elif status_data["reason"].lower() == "pipelineruncancelled":
+            click.echo(click.style(
+                f"{result['metadata']['name']} cannot be cancelled again. It has already been cancelled",
+                fg="yellow",
+                bold=True,
+            ))
+            runs_to_cancel_count -= 1
+    click.echo(f"Cancelled {runs_to_cancel_count} runs")
 
 
 @build.command(name="delete", help="Delete a build (only admins for now)")
