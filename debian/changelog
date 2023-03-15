@@ -1,3 +1,20 @@
+toolforge-cli (0.2.7) buster; urgency=medium
+
+  [ David Caro ]
+  * [34df4af] README: update the build/deploy docs
+
+  [ Raymond Ndibe ]
+  * [80bb868] toolforge-cli: Implement the global --verbose flag as an env var
+
+  [ David Caro ]
+  * [ccac0d5] build: use the default user and group
+
+  [ Raymond Ndibe ]
+  * [f6370f2] cli: build cancel show a useful message when http error
+  * [a6972a5] cli: make cancel command more user friendly
+
+ -- Raymond Ndibe <rolisaemeka-ctr@wikimedia.org>  Wed, 15 Mar 2023 21:17:04 +0000
+
 toolforge-cli (0.2.6) buster; urgency=medium
 
   [ David Caro ]

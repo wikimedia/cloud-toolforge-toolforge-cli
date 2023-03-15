@@ -54,7 +54,7 @@ That will:
 At this point, you should create a commit and send it for review, and continue once merged.
 
 ```
-~:$  git commit -m "Bumped version to <new_version>" --sign-off
+~:$  git commit -m "Bumped version to <new_version>" --signoff
 ~:$  git review  # if you have https://opendev.org/opendev/git-review installed
 ```
 
