@@ -21,8 +21,6 @@ PIPELINE_RUN_SKELETON = {
             {"name": "BUILDER_IMAGE", "value": "docker-registry.tools.wmflabs.org/toolforge-bullseye0-builder:latest"},
             {"name": "APP_IMAGE", "value": "192.168.49.1/minikube-user/python:snap"},
             {"name": "SOURCE_URL", "value": "https://github.com/david-caro/wm-lol"},
-            {"name": "USER_ID", "value": "61312"},
-            {"name": "GROUP_ID", "value": "61312"},
         ],
         "workspaces": [{"name": "source-ws", "emptyDir": {}}, {"name": "cache-ws", "emptyDir": {}}],
     },
