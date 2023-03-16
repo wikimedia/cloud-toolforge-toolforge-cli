@@ -395,13 +395,13 @@ def build():
 @click.option(
     "--builder-image",
     help="This is the image identifier for the buildpack builder, without protocol (no http/https)",
-    default="harbor-tools.wmflabs.org/toolforge/heroku-builder-classic:22",
+    default="tools-harbor.wmcloud.org/toolforge/heroku-builder-classic:22",
     show_default=True,
 )
 @click.option(
     "--dest-repository",
     help="FQDN to the OCI repository to push the image to, without the protocol (no http/https)",
-    default="harbor.tools.wmflabs.org",
+    default="tools-harbor.wmcloud.org",
     show_default=True,
 )
 @click.option(

@@ -25,7 +25,7 @@ PIPELINE_RUN_SKELETON = {
         "serviceAccountName": "buildpacks-service-account",
         "pipelineRef": {"name": "buildpacks"},
         "params": [
-            {"name": "BUILDER_IMAGE", "value": "harbor-tools.wmflabs.org/toolforge/heroku-builder-classic:22"},
+            {"name": "BUILDER_IMAGE", "value": "tools-harbor.wmcloud.org/toolforge/heroku-builder-classic:22"},
             {"name": "APP_IMAGE", "value": "192.168.49.1/minikube-user/python:snap"},
             {"name": "SOURCE_URL", "value": "https://github.com/david-caro/wm-lol"},
         ],
