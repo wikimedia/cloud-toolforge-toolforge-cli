@@ -3,14 +3,13 @@ from typing import Any, Dict, Optional
 
 ERROR_STRINGS = {
     "SERVICE_DOWN_ERROR": (
-        "The build service seems to be down – please retry in a few minutes.\nIf the problem persists, " +
-        "please contact us or open a bug:\nsee https://phabricator.wikimedia.org/T324822"
+        "The build service seems to be down – please retry in a few minutes.\nIf the problem persists, "
+        + "please contact us or open a bug:\nsee https://phabricator.wikimedia.org/T324822"
     ),
     "UNKOWN_ERROR": (
-        "An unknown error occured while trying to perform this operation.\nIf the problem persists, " +
-        "please contact us or open a bug:\nsee https://phabricator.wikimedia.org/T324822"
-
-    )
+        "An unknown error occured while trying to perform this operation.\nIf the problem persists, "
+        + "please contact us or open a bug:\nsee https://phabricator.wikimedia.org/T324822"
+    ),
 }
 
 PIPELINE_RUN_SKELETON = {
