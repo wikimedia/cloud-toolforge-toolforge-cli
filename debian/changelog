@@ -1,3 +1,11 @@
+toolforge-cli (0.2.8) buster; urgency=medium
+
+  [ David Caro ]
+  * [7605522] builder: use the heroku builder by default
+  * [8d837c5] Update the harbor fqdn
+
+ -- Raymond Ndibe <rolisaemeka-ctr@wikimedia.org>  Mon, 27 Mar 2023 23:22:54 +0000
+
 toolforge-cli (0.2.7) buster; urgency=medium
 
   [ David Caro ]
