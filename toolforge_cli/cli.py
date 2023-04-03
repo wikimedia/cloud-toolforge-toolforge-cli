@@ -1,24 +1,40 @@
 #!/usr/bin/env python3
+from __future__ import annotations
+
 import json as json_mod
 import logging
 import os
 import subprocess
 import sys
 import time
-from functools import wraps
+from functools import lru_cache, wraps
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple, cast
 
 import click
 from requests.exceptions import ConnectionError, HTTPError
 
 import toolforge_cli.build as toolforge_build
+from toolforge_cli.config import Config, load_config
 from toolforge_cli.k8sclient import K8sAPIClient
 
-TOOLFORGE_PREFIX = "toolforge-"
-TBS_NAMESPACE = "image-build"
-ADMIN_GROUP_NAMES = ["admins", "system:masters"]
 LOGGER = logging.getLogger("toolforge" if __name__ == "__main__" else __name__)
+
+
+@lru_cache(maxsize=None)
+def _load_config_from_ctx() -> Config:
+    ctx = click.get_current_context()
+    return cast(Config, ctx.obj["config"])
+
+
+@lru_cache(maxsize=None)
+def get_loaded_config() -> Config:
+    return load_config()
+
+
+def _get_build_k8s(kubeconfig: Path) -> K8sAPIClient:
+    config = _load_config_from_ctx()
+    return K8sAPIClient.from_file(kubeconfig=kubeconfig, namespace=config.build.build_service_namespace)
 
 
 def _execute_k8s_client_method(method, kwargs: Dict[str, Any]):
@@ -302,17 +318,17 @@ def _run_external_command(*args, binary: str, verbose: bool = False) -> None:
         raise subprocess.CalledProcessError(returncode=proc.returncode, output=None, stderr=None, cmd=cmd)
 
 
-def _add_discovered_subcommands(cli: click.Group) -> click.Group:
+def _add_discovered_subcommands(cli: click.Group, config: Config) -> click.Group:
     bins_path = os.environ.get("PATH", ".")
     subcommands: Dict[str, Path] = {}
     LOGGER.debug("Looking for subcommands...")
     for dir_str in reversed(bins_path.split(":")):
         dir_path = Path(dir_str)
         LOGGER.debug(f"Checking under {dir_path}...")
-        for command in dir_path.glob(f"{TOOLFORGE_PREFIX}*"):
+        for command in dir_path.glob(f"{config.toolforge_prefix}*"):
             LOGGER.debug(f"Checking {command}...")
             if command.is_file() and os.access(command, os.X_OK):
-                subcommand_name = command.name[len(TOOLFORGE_PREFIX) :]
+                subcommand_name = command.name[len(config.toolforge_prefix) :]
                 subcommands[subcommand_name] = command
 
     LOGGER.debug(f"Found {len(subcommands)} subcommands.")
@@ -367,7 +383,8 @@ def generate_default_image_name() -> str:
 @click.pass_context
 def toolforge(ctx: click.Context, verbose: bool) -> None:
     ctx.ensure_object(dict)
-    ctx.obj['verbose'] = verbose
+    ctx.obj["verbose"] = verbose
+    ctx.obj["config"] = get_loaded_config()
     pass
 
 
@@ -395,13 +412,13 @@ def build():
 @click.option(
     "--builder-image",
     help="This is the image identifier for the buildpack builder, without protocol (no http/https)",
-    default="tools-harbor.wmcloud.org/toolforge/heroku-builder-classic:22",
+    default=get_loaded_config().build.builder_image,
     show_default=True,
 )
 @click.option(
     "--dest-repository",
     help="FQDN to the OCI repository to push the image to, without the protocol (no http/https)",
-    default="tools-harbor.wmcloud.org",
+    default=get_loaded_config().build.dest_repository,
     show_default=True,
 )
 @click.option(
@@ -420,13 +437,15 @@ def build_start(
     ref: Optional[str] = None,
 ) -> None:
     if not source_git_url:
-        message = (f"{click.style('Error:', bold=True, fg='red')} Please provide a git url for your source code.\n" +
-                   f"{click.style('Example:', bold=True)}" +
-                   " toolforge build start 'https://gitlab.wikimedia.org/toolforge-repos/my-tool'")
+        message = (
+            f"{click.style('Error:', bold=True, fg='red')} Please provide a git url for your source code.\n"
+            + f"{click.style('Example:', bold=True)}"
+            + " toolforge build start 'https://gitlab.wikimedia.org/toolforge-repos/my-tool'"
+        )
         click.echo(message)
         return
 
-    k8s_client = K8sAPIClient.from_file(kubeconfig=kubeconfig, namespace=TBS_NAMESPACE)
+    k8s_client = _get_build_k8s(kubeconfig=kubeconfig)
     app_image = toolforge_build.get_app_image_url(
         image_name=image_name, image_tag=image_tag, image_repository=dest_repository, user=k8s_client.user
     )
@@ -438,15 +457,12 @@ def build_start(
         ref=ref,
     )
 
-    method_kwargs = {
-        "kind": "pipelineruns",
-        "spec": pipeline_run_spec
-    }
+    method_kwargs = {"kind": "pipelineruns", "spec": pipeline_run_spec}
     response = _execute_k8s_client_method(method=k8s_client.create_object, kwargs=method_kwargs)
     run_name = response["metadata"]["name"]
     message = (
-        f"Building '{source_git_url}' -> '{app_image}'\n" +
-        f"You can see the status with:\n\ttoolforge build show '{run_name}'"
+        f"Building '{source_git_url}' -> '{app_image}'\n"
+        + f"You can see the status with:\n\ttoolforge build show '{run_name}'"
     )
     click.echo(message)
 
@@ -455,9 +471,10 @@ def build_start(
 @click.argument("RUN_NAME")
 @shared_build_options
 def build_logs(run_name: str, kubeconfig: Path) -> None:
-    k8s_client = K8sAPIClient.from_file(kubeconfig=kubeconfig, namespace=TBS_NAMESPACE)
+    config = _load_config_from_ctx()
+    k8s_client = _get_build_k8s(kubeconfig=kubeconfig)
 
-    if k8s_client.org_name in ADMIN_GROUP_NAMES:
+    if k8s_client.org_name in config.build.admin_group_names:
         click.echo(
             click.style(
                 "This feature is not yet available for non-admin users, but will be soon!",
@@ -467,7 +484,9 @@ def build_logs(run_name: str, kubeconfig: Path) -> None:
         )
         return
 
-    _run_external_command("pipelinerun", "logs", "--namespace", TBS_NAMESPACE, "-f", run_name, binary="tkn")
+    _run_external_command(
+        "pipelinerun", "logs", "--namespace", config.build.build_service_namespace, "-f", run_name, binary="tkn"
+    )
 
 
 @build.command(name="list", help="List builds")
@@ -478,11 +497,8 @@ def build_logs(run_name: str, kubeconfig: Path) -> None:
 )
 @shared_build_options
 def build_list(kubeconfig: Path, json: bool) -> None:
-    k8s_client = K8sAPIClient.from_file(kubeconfig=kubeconfig, namespace=TBS_NAMESPACE)
-    method_kwargs = {
-        "kind": "pipelineruns",
-        "selector": f"user={k8s_client.user}"
-    }
+    k8s_client = _get_build_k8s(kubeconfig=kubeconfig)
+    method_kwargs = {"kind": "pipelineruns", "selector": f"user={k8s_client.user}"}
     runs = _execute_k8s_client_method(method=k8s_client.get_objects, kwargs=method_kwargs)
 
     if not json:
@@ -526,11 +542,8 @@ def build_cancel(kubeconfig: Path, build_name: List[str], all: bool, yes_i_know:
         click.echo("No run passed to cancel.")
         return
 
-    k8s_client = K8sAPIClient.from_file(kubeconfig=kubeconfig, namespace=TBS_NAMESPACE)
-    kwargs = {
-        "kind": "pipelineruns",
-        "selector": f"user={k8s_client.user}"
-    }
+    k8s_client = _get_build_k8s(kubeconfig=kubeconfig)
+    kwargs = {"kind": "pipelineruns", "selector": f"user={k8s_client.user}"}
     all_user_runs = _execute_k8s_client_method(k8s_client.get_objects, kwargs)
 
     runs_to_cancel = []
@@ -551,25 +564,29 @@ def build_cancel(kubeconfig: Path, build_name: List[str], all: bool, yes_i_know:
         run_kwargs = {
             "kind": "pipelineruns",
             "name": run["metadata"]["name"],
-            "json_patches": [{"op": "add", "path": "/spec/status", "value": "PipelineRunCancelled"}]
+            "json_patches": [{"op": "add", "path": "/spec/status", "value": "PipelineRunCancelled"}],
         }
         # We rely on patch never returning some kind of error dictionary when canceling the
         # pipelinerun no matter it's state, this might change in the future
         result = _execute_k8s_client_method(k8s_client.patch_object, run_kwargs)
         status_data = _get_status_data(result)
         if status_data["reason"].lower() in ["failed", "succeeded"]:
-            click.echo(click.style(
-                f"{result['metadata']['name']} cannot be cancelled because it has already completed",
-                fg="yellow",
-                bold=True,
-            ))
+            click.echo(
+                click.style(
+                    f"{result['metadata']['name']} cannot be cancelled because it has already completed",
+                    fg="yellow",
+                    bold=True,
+                )
+            )
             runs_to_cancel_count -= 1
         elif status_data["reason"].lower() == "pipelineruncancelled":
-            click.echo(click.style(
-                f"{result['metadata']['name']} cannot be cancelled again. It has already been cancelled",
-                fg="yellow",
-                bold=True,
-            ))
+            click.echo(
+                click.style(
+                    f"{result['metadata']['name']} cannot be cancelled again. It has already been cancelled",
+                    fg="yellow",
+                    bold=True,
+                )
+            )
             runs_to_cancel_count -= 1
     click.echo(f"Cancelled {runs_to_cancel_count} runs")
 
@@ -596,11 +613,8 @@ def build_delete(kubeconfig: Path, build_name: List[str], all: bool, yes_i_know:
         click.echo("No run passed to delete")
         return
 
-    k8s_client = K8sAPIClient.from_file(kubeconfig=kubeconfig, namespace=TBS_NAMESPACE)
-    method_kwargs = {
-        "kind": "pipelineruns",
-        "selector": f"user={k8s_client.user}"
-    }
+    k8s_client = _get_build_k8s(kubeconfig=kubeconfig)
+    method_kwargs = {"kind": "pipelineruns", "selector": f"user={k8s_client.user}"}
     all_user_runs = _execute_k8s_client_method(method=k8s_client.get_objects, kwargs=method_kwargs)
 
     runs_to_delete = []
@@ -631,10 +645,8 @@ def build_delete(kubeconfig: Path, build_name: List[str], all: bool, yes_i_know:
 )
 @shared_build_options
 def build_show(run_name: str, kubeconfig: Path, json: bool) -> None:
-    k8s_client = K8sAPIClient.from_file(kubeconfig=kubeconfig, namespace=TBS_NAMESPACE)
-    method_kwargs = {
-        "kind": "pipelineruns"
-    }
+    k8s_client = _get_build_k8s(kubeconfig=kubeconfig)
+    method_kwargs = {"kind": "pipelineruns"}
     if run_name:
         method_kwargs["name"] = run_name
         run = _execute_k8s_client_method(method=k8s_client.get_object, kwargs=method_kwargs)
@@ -645,13 +657,15 @@ def build_show(run_name: str, kubeconfig: Path, json: bool) -> None:
         run = runs[0] if len(runs) > 0 else None
 
     if not run:
-        click.echo(click.style(
-            (
-                "No builds found, you can start one using `toolforge build start`," +
-                "run `toolforge build start --help` for more details"
-            ),
-            fg="yellow"
-        ))
+        click.echo(
+            click.style(
+                (
+                    "No builds found, you can start one using `toolforge build start`,"
+                    + "run `toolforge build start --help` for more details"
+                ),
+                fg="yellow",
+            )
+        )
         return
 
     app_image = next(param for param in run["spec"]["params"] if param["name"] == "APP_IMAGE")["value"]
@@ -688,7 +702,8 @@ def main() -> int:
     else:
         logging.basicConfig(level=logging.INFO)
 
-    _add_discovered_subcommands(cli=toolforge)
+    config = get_loaded_config()
+    _add_discovered_subcommands(cli=toolforge, config=config)
     try:
         toolforge()
     except subprocess.CalledProcessError as err:
