@@ -43,7 +43,7 @@ def _execute_k8s_client_method(method, kwargs: Dict[str, Any]):
     except ConnectionError:
         click.echo(click.style(toolforge_build.ERROR_STRINGS["SERVICE_DOWN_ERROR"], fg="red", bold=True))
     except HTTPError:
-        click.echo(click.style(toolforge_build.ERROR_STRINGS["UNKOWN_ERROR"], fg="red", bold=True))
+        click.echo(click.style(toolforge_build.ERROR_STRINGS["UNKNOWN_ERROR"], fg="red", bold=True))
     sys.exit(1)
 
 
@@ -187,7 +187,7 @@ def _get_init_containers_details(run_name: str, task_name: str, k8s_client: K8sA
             reason = f"{init_container_status['terminated']['reason']}:{init_container_status['terminated']['message']}"
         elif "waiting" in init_container_status:
             init_container_status_str = click.style("waiting", fg="white")
-            reason = init_container_status["waiting"].get("reason", "UnownReason")
+            reason = init_container_status["waiting"].get("reason", "UnknownReason")
         elif "terminated" in init_container_status:
             init_container_status_str = click.style("ok", fg="green")
             reason = f"{init_container_status['terminated']['reason']}"
