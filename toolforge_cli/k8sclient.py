@@ -2,6 +2,7 @@
 Originally copied from
 https://github.com/wikimedia/cloud-toolforge-jobs-framework-api/blob/main/common/k8sclient.py
 """
+import json
 from pathlib import Path
 from typing import Any, Dict, List, Optional, cast
 
@@ -10,6 +11,10 @@ import urllib3
 import yaml
 from cryptography import x509
 from cryptography.hazmat.backends import default_backend
+from functools import wraps
+from requests.exceptions import ConnectionError, HTTPError
+
+import toolforge_cli.build as toolforge_build
 
 # T253412: Disable warnings about unverifed TLS certs when talking to the
 # Kubernetes API endpoint
@@ -18,12 +23,36 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 StatusCode = int
 
 
-class NotFound(Exception):
-    pass
-
-
 class BadConfig(Exception):
     pass
+
+
+class K8sError(Exception):
+    def to_str(self) -> str:
+        return str(self)
+
+
+class BadRequest(K8sError):
+    def to_str(self) -> str:
+        err_str = str(self)
+        err_dict = json.loads(err_str)
+        return err_dict["message"]
+
+
+def with_k8s_error(func):
+    @wraps(func)
+    def _inner(*args, **kwargs):
+        try:
+            return func(*args, **kwargs)
+        except ConnectionError as error:
+            raise K8sError(toolforge_build.ERROR_STRINGS["SERVICE_DOWN_ERROR"]) from error
+        except HTTPError as error:
+            if error.response.status_code == 400:
+                raise BadRequest(error.response.text) from error
+            if error.response.status_code == 404:
+                raise K8sError(f"Your request could not be completed. {error}") from error
+            raise K8sError(toolforge_build.ERROR_STRINGS["UNKNOWN_ERROR"]) from error
+    return _inner
 
 
 class K8sAPIClient:
@@ -122,26 +151,26 @@ class K8sAPIClient:
             kwargs["timeout"] = self.timeout_s
         return kwargs
 
+    @with_k8s_error
     def _get(self, url: str, **kwargs) -> Dict[str, Any]:
         response = self.session.get(**self._make_requests_kwargs(url, **kwargs))
         response.raise_for_status()
         return response.json()
 
+    @with_k8s_error
     def _post(self, url, **kwargs) -> requests.Response:
         response = self.session.post(**self._make_requests_kwargs(url, **kwargs))
-        if response.status_code == 400:
-            raise Exception(f"Bad request: {response.text}")
         response.raise_for_status()
         return response
 
+    @with_k8s_error
     def _patch(self, url, **kwargs) -> requests.Response:
         requests_kwargs = self._make_requests_kwargs(url, **kwargs)
         response = self.session.patch(**requests_kwargs)
-        if response.status_code == 400:
-            raise Exception(f"Bad request: {response.text}")
         response.raise_for_status()
         return response
 
+    @with_k8s_error
     def _delete(self, url: str, **kwargs) -> StatusCode:
         response = self.session.delete(**self._make_requests_kwargs(url, **kwargs))
         response.raise_for_status()
@@ -155,17 +184,11 @@ class K8sAPIClient:
         )["items"]
 
     def get_object(self, kind: str, name: Optional[str] = None) -> Dict[str, Any]:
-        try:
-            return self._get(
-                url=kind,
-                name=name,
-                version=K8sAPIClient.KIND_TO_VERSION[kind],
-            )
-        except requests.exceptions.HTTPError as error:
-            if error.response.status_code == 404:
-                raise NotFound(f"Unable to find an object with name '{name}' of kind '{kind}'") from error
-
-            raise
+        return self._get(
+            url=kind,
+            name=name,
+            version=K8sAPIClient.KIND_TO_VERSION[kind],
+        )
 
     def delete_objects(self, kind: str, selector: Optional[str] = None) -> List[StatusCode]:
         status_codes = []
@@ -190,17 +213,11 @@ class K8sAPIClient:
         return status_codes
 
     def delete_object(self, kind: str, name: Optional[str] = None) -> None:
-        try:
-            self._delete(
-                url=kind,
-                name=name,
-                version=K8sAPIClient.KIND_TO_VERSION[kind],
-            )
-        except requests.exceptions.HTTPError as error:
-            if error.response.status_code == 404:
-                raise NotFound(f"Unable to find an object with name '{name}' of kind '{kind}'") from error
-
-            raise
+        self._delete(
+            url=kind,
+            name=name,
+            version=K8sAPIClient.KIND_TO_VERSION[kind],
+        )
 
     def create_object(self, kind: str, spec: Dict[str, Any]) -> Dict[str, Any]:
         return self._post(

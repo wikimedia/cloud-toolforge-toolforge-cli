@@ -12,11 +12,10 @@ from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Tuple, cast
 
 import click
-from requests.exceptions import ConnectionError, HTTPError
 
 import toolforge_cli.build as toolforge_build
 from toolforge_cli.config import Config, load_config
-from toolforge_cli.k8sclient import K8sAPIClient
+from toolforge_cli.k8sclient import K8sAPIClient, K8sError
 
 LOGGER = logging.getLogger("toolforge" if __name__ == "__main__" else __name__)
 
@@ -40,10 +39,8 @@ def _get_build_k8s(kubeconfig: Path) -> K8sAPIClient:
 def _execute_k8s_client_method(method, kwargs: Dict[str, Any]):
     try:
         return method(**kwargs)
-    except ConnectionError:
-        click.echo(click.style(toolforge_build.ERROR_STRINGS["SERVICE_DOWN_ERROR"], fg="red", bold=True))
-    except HTTPError:
-        click.echo(click.style(toolforge_build.ERROR_STRINGS["UNKNOWN_ERROR"], fg="red", bold=True))
+    except K8sError as err:
+        click.echo(click.style(err.to_str(), fg="red", bold=True))
     sys.exit(1)
 
 
