@@ -95,13 +95,10 @@ def _get_run_data(run: Dict[str, Any]) -> Dict[str, Any]:
     ref = next((param for param in run["spec"]["params"] if param["name"] == "SOURCE_REFERENCE"), {"value": "no ref"})[
         "value"
     ]
-    status_data = _get_status_data(run)
-    start_time = status_data["start_time"]
-    end_time = status_data["end_time"]
-    status = status_data["status"]
-
+    status_data = _get_status_data(run=run)
     return {
         "name": run_name,
+        **status_data,
         "params": {
             "image_name": image_name,
             "image_tag": image_tag,
@@ -109,10 +106,7 @@ def _get_run_data(run: Dict[str, Any]) -> Dict[str, Any]:
             "source_url": source_url,
             "ref": ref,
             "builder_image": builder_image,
-        },
-        "start_time": start_time,
-        "end_time": end_time,
-        "status": status,
+        }
     }
 
 
@@ -143,9 +137,8 @@ def _run_to_short_str(run_data: Dict[str, Any]) -> str:
     )
 
 
-def _get_status_data_lines(k8s_obj: Dict[str, Any]) -> List[str]:
+def _get_status_data_lines(status_data: Dict[str, Any]) -> List[str]:
     status_data_lines = []
-    status_data = _get_status_data(k8s_obj)
 
     start_time = status_data["start_time"]
     end_time = status_data["end_time"]
@@ -171,33 +164,83 @@ def _get_status_data_lines(k8s_obj: Dict[str, Any]) -> List[str]:
     return status_data_lines
 
 
-def _get_init_containers_details(run_name: str, task_name: str, k8s_client: K8sAPIClient) -> List[str]:
+def _get_init_containers_details(
+    run_name: str, task_name: str, k8s_client: K8sAPIClient
+) -> List[Dict[str, Any]]:
     """Sometimes these fail before getting to any of the steps."""
     pod_name = f"{run_name}-{task_name}-pod"
     pod_data = k8s_client.get_object(kind="pods", name=pod_name)
-    init_containers_lines = []
+    init_containers = []
+
     for init_container in pod_data["status"]["initContainerStatuses"]:
-        init_container_status_str = click.style("unknown", fg="yellow")
+        init_container_status_str = "unknown"
         init_container_status = init_container["state"]
         if "terminated" in init_container_status and init_container_status["terminated"]["exitCode"] != 0:
-            init_container_status_str = click.style("error", fg="red")
+            init_container_status_str = "error"
             reason = f"{init_container_status['terminated']['reason']}:{init_container_status['terminated']['message']}"
         elif "waiting" in init_container_status:
-            init_container_status_str = click.style("waiting", fg="white")
+            init_container_status_str = "waiting"
             reason = init_container_status["waiting"].get("reason", "UnknownReason")
         elif "terminated" in init_container_status:
-            init_container_status_str = click.style("ok", fg="green")
+            init_container_status_str = "ok"
             reason = f"{init_container_status['terminated']['reason']}"
 
+        init_containers.append(
+            {
+                "name": init_container["name"],
+                "status": init_container_status_str,
+                "reason": reason,
+            }
+        )
+
+    return init_containers
+
+
+def _get_init_containers_details_lines(init_containers: List[Dict[str, Any]]) -> List[str]:
+    """Sometimes these fail before getting to any of the steps."""
+    init_containers_lines = []
+    status = {
+        "ok": click.style("ok", fg="green"),
+        "waiting": click.style("waiting", fg="white"),
+        "error": click.style("error", fg="red"),
+        "unknown": click.style("unknown", fg="yellow"),
+    }
+    for init_container in init_containers:
         init_containers_lines.append(
             f"{click.style('Init-container:', bold=True)} {init_container['name']} - "
-            f"{init_container_status_str}({reason})"
+            f"{status[init_container['status']]}({init_container['reason']})"
         )
 
     return init_containers_lines
 
 
-def _get_step_details_lines(task: Dict[str, Any]) -> List[str]:
+def _get_step_details(steps) -> List[Dict[str, Any]]:
+    steps_details = []
+    for step in steps:
+        step_status = "unknown"
+        reason = step
+        if "terminated" in step and step["terminated"]["exitCode"] != 0:
+            reason = step["terminated"]["reason"]
+            if reason.endswith("Cancelled"):
+                step_status = "cancelled"
+            else:
+                step_status = "error"
+        elif "terminated" in step and step["terminated"]["exitCode"] == 0:
+            step_status = "ok"
+            reason = step["terminated"]["reason"]
+        elif "waiting" in step:
+            step_status = "waiting"
+            reason = step["waiting"].get("reason", "UnknownReason")
+        elif "running" in step:
+            step_status = "running"
+            reason = f"started at [{step['running'].get('startedAt', 'unknown')}]"
+
+        steps_details.append({"name": step["name"], "status": step_status, "reason": reason})
+
+    return steps_details
+
+
+def _get_step_details_lines(steps: List[Dict[str, Any]]) -> List[str]:
     steps_details_lines = []
     status = {
         "ok": click.style("ok", fg="green"),
@@ -208,84 +251,96 @@ def _get_step_details_lines(task: Dict[str, Any]) -> List[str]:
         "unknown": click.style("unknown", fg="yellow"),
     }
 
-    for step in task["status"]["steps"]:
-        step_status = status["unknown"]
-        reason = step
-        if "terminated" in step and step["terminated"]["exitCode"] != 0:
-            reason = step["terminated"]["reason"]
-            if reason.endswith("Cancelled"):
-                step_status = status["cancelled"]
-            else:
-                step_status = status["error"]
-        elif "terminated" in step and step["terminated"]["exitCode"] == 0:
-            step_status = status["ok"]
-            reason = step["terminated"]["reason"]
-        elif "waiting" in step:
-            step_status = status["waiting"]
-            reason = step["waiting"].get("reason", "UnknownReason")
-        elif "running" in step:
-            step_status = status["running"]
-            reason = f"started at [{step['running'].get('startedAt', 'unknown')}]"
-
-        steps_details_lines.append(f"{click.style('Step:', bold=True)} {step['name']} - {step_status}({reason})")
+    for step in steps:
+        steps_details_lines.append(
+            f"{click.style('Step:', bold=True)} {step['name']} - {status[step['status']]}({step['reason']})"
+        )
 
     return steps_details_lines
 
 
-def _get_task_details_lines(run: Dict[str, Any], k8s_client: K8sAPIClient) -> List[str]:
-    tasks_details_lines = []
+def _get_task_details(run: Dict[str, Any], k8s_client: K8sAPIClient) -> List[Dict[str, Any]]:
+    tasks_details = []
 
     for task in run.get("status", {}).get("taskRuns", {}).values():
-        tasks_details_lines.append(f"{click.style('Task:', bold=True)} {task['pipelineTaskName']}")
-        tasks_details_lines.extend("    " + line for line in _get_status_data_lines(k8s_obj=task))
-        tasks_details_lines.append("")
+        status_data = _get_status_data(run=task)
+
+        task_details = {
+            "task_name": task["pipelineTaskName"],
+            **status_data
+        }
 
         # A task can fail before any steps are executed
         if "steps" in task["status"]:
-            tasks_details_lines.append(click.style("    Steps:", bold=True))
-            tasks_details_lines.extend("        " + line for line in _get_step_details_lines(task=task))
-            tasks_details_lines.append("")
+            steps_details = _get_step_details(steps=task["status"]["steps"])
+            task_details["steps"] = steps_details
 
-            status_data = _get_status_data(task)
             if status_data["status"] in ["cancelled", "error"] and all(
                 "waiting" in step for step in task["status"]["steps"]
             ):
                 # Sometimes the task fails in the init containers, so if that happened, show the errors there too
-                tasks_details_lines.append(click.style("    Init containers:", bold=True))
-                tasks_details_lines.extend(
-                    "        " + line
-                    for line in _get_init_containers_details(
+                init_containers = _get_init_containers_details(
                         run_name=run["metadata"]["name"], task_name=task["pipelineTaskName"], k8s_client=k8s_client
                     )
-                )
+                task_details["init_containers"] = init_containers
+        tasks_details.append(task_details)
+
+    return tasks_details
+
+
+def _get_task_details_lines(tasks_details: List[Dict[str, Any]]) -> List[str]:
+    tasks_details_lines = []
+
+    for task in tasks_details:
+        tasks_details_lines.append(f"{click.style('Task:', bold=True)} {task['task_name']}")
+        tasks_details_lines.extend("    " + line for line in _get_status_data_lines(status_data=task))
+        tasks_details_lines.append("")
+
+        # A task can fail before any steps are executed
+        if "steps" in task:
+            steps_details_lines = _get_step_details_lines(steps=task["steps"])
+
+            tasks_details_lines.append(click.style("    Steps:", bold=True))
+            tasks_details_lines.extend("        " + line for line in steps_details_lines)
+            tasks_details_lines.append("")
+
+        if "init_containers" in task:
+            # Sometimes the task fails in the init containers, so if that happened, show the errors there too
+            init_containers_lines = _get_init_containers_details_lines(init_containers=task["init_containers"])
+            tasks_details_lines.append(click.style("    Init containers:", bold=True))
+            tasks_details_lines.extend(
+                "        " + line
+                for line in init_containers_lines
+            )
 
     return tasks_details_lines
 
 
-def _run_to_details_str(run: Dict[str, Any], k8s_client: K8sAPIClient) -> str:
+def _run_to_details(run: Dict[str, Any], k8s_client: K8sAPIClient, verbose: bool) -> Dict[str, Any]:
+    run_details = _get_run_data(run=run)
+    if verbose:
+        run_details["tasks"] = _get_task_details(run=run, k8s_client=k8s_client)
+    return run_details
+
+
+def _run_to_details_str(run_details: Dict[str, Any]) -> str:
+    status_data_lines = _get_status_data_lines(status_data=run_details)
     details_str = ""
-    run_name = run["metadata"]["name"]
-    details_str += f"{click.style('Name:', bold=True)} {click.style(run_name, fg='blue')}\n"
-
-    details_str += "\n".join(_get_status_data_lines(k8s_obj=run)) + "\n"
-
-    app_image = next(param for param in run["spec"]["params"] if param["name"] == "APP_IMAGE")["value"]
-    repo_url, image_name, image_tag = _app_image_to_parts(app_image)
-    builder_image = next(param for param in run["spec"]["params"] if param["name"] == "BUILDER_IMAGE")["value"]
-    source_url = next(param for param in run["spec"]["params"] if param["name"] == "SOURCE_URL")["value"]
-    ref = next((param for param in run["spec"]["params"] if param["name"] == "SOURCE_REFERENCE"), {"value": "no ref"})[
-        "value"
-    ]
+    details_str += f"{click.style('Name:', bold=True)} {click.style(run_details['name'], fg='blue')}\n"
+    details_str += "\n".join(status_data_lines) + "\n"
     details_str += click.style("Parameters:\n", bold=True)
-    details_str += f"    {click.style('source_url:', bold=True)} {source_url}\n"
-    details_str += f"    {click.style('ref:', bold=True)} {ref}\n"
-    details_str += f"    {click.style('image_name:', bold=True)} {image_name}\n"
-    details_str += f"    {click.style('image_tag:', bold=True)} {image_tag}\n"
-    details_str += f"    {click.style('repo_url:', bold=True)} {repo_url}\n"
-    details_str += f"    {click.style('builder_image:', bold=True)} {builder_image}\n"
+    details_str += f"    {click.style('source_url:', bold=True)} {run_details['params']['source_url']}\n"
+    details_str += f"    {click.style('ref:', bold=True)} {run_details['params']['ref']}\n"
+    details_str += f"    {click.style('image_name:', bold=True)} {run_details['params']['image_name']}\n"
+    details_str += f"    {click.style('image_tag:', bold=True)} {run_details['params']['image_tag']}\n"
+    details_str += f"    {click.style('repo_url:', bold=True)} {run_details['params']['repo_url']}\n"
+    details_str += f"    {click.style('builder_image:', bold=True)} {run_details['params']['builder_image']}\n"
 
-    details_str += click.style("Tasks:\n", bold=True)
-    details_str += "\n".join("    " + line for line in _get_task_details_lines(run=run, k8s_client=k8s_client))
+    if "tasks" in run_details:
+        tasks_details_lines = _get_task_details_lines(tasks_details=run_details["tasks"])
+
+        details_str += click.style("Tasks:\n", bold=True)
+        details_str += "\n".join("    " + line for line in tasks_details_lines)
 
     return details_str
 
@@ -376,7 +431,12 @@ def generate_default_image_name() -> str:
 
 @click.version_option()
 @click.group(name="toolforge", help="Toolforge command line")
-@click.option("-v", "--verbose", help="Show extra verbose output", is_flag=True)
+@click.option(
+    "-v",
+    "--verbose",
+    help="Show extra verbose output. NOTE: Do no rely on the format of the verbose output",
+    is_flag=True
+)
 @click.pass_context
 def toolforge(ctx: click.Context, verbose: bool) -> None:
     ctx.ensure_object(dict)
@@ -510,7 +570,7 @@ def build_list(kubeconfig: Path, json: bool) -> None:
         )
 
     for run in sorted(runs, key=lambda run: run["metadata"]["creationTimestamp"], reverse=True):
-        run_data = _get_run_data(run)
+        run_data = _get_run_data(run=run)
         if json:
             click.echo(json_mod.dumps(run_data, indent=4))
         else:
@@ -566,7 +626,7 @@ def build_cancel(kubeconfig: Path, build_name: List[str], all: bool, yes_i_know:
         # We rely on patch never returning some kind of error dictionary when canceling the
         # pipelinerun no matter it's state, this might change in the future
         result = _execute_k8s_client_method(k8s_client.patch_object, run_kwargs)
-        status_data = _get_status_data(result)
+        status_data = _get_status_data(run=result)
         if status_data["reason"].lower() in ["failed", "succeeded"]:
             click.echo(
                 click.style(
@@ -641,19 +701,21 @@ def build_delete(kubeconfig: Path, build_name: List[str], all: bool, yes_i_know:
     is_flag=True,
 )
 @shared_build_options
-def build_show(run_name: str, kubeconfig: Path, json: bool) -> None:
+@click.pass_context
+def build_show(ctx, run_name: str, kubeconfig: Path, json: bool) -> None:
+    verbose = ctx.obj.get("verbose", False)
     k8s_client = _get_build_k8s(kubeconfig=kubeconfig)
     method_kwargs = {"kind": "pipelineruns"}
     if run_name:
         method_kwargs["name"] = run_name
-        run = _execute_k8s_client_method(method=k8s_client.get_object, kwargs=method_kwargs)
+        raw_run = _execute_k8s_client_method(method=k8s_client.get_object, kwargs=method_kwargs)
     else:
         method_kwargs["selector"] = f"user={k8s_client.user}"
-        runs = _execute_k8s_client_method(method=k8s_client.get_objects, kwargs=method_kwargs)
-        runs = sorted(runs, key=lambda run: run["metadata"]["creationTimestamp"], reverse=True)
-        run = runs[0] if len(runs) > 0 else None
+        raw_runs = _execute_k8s_client_method(method=k8s_client.get_objects, kwargs=method_kwargs)
+        raw_runs = sorted(raw_runs, key=lambda raw_run: raw_run["metadata"]["creationTimestamp"], reverse=True)
+        raw_run = raw_runs[0] if len(raw_runs) > 0 else None
 
-    if not run:
+    if not raw_run:
         click.echo(
             click.style(
                 (
@@ -665,27 +727,13 @@ def build_show(run_name: str, kubeconfig: Path, json: bool) -> None:
         )
         return
 
-    app_image = next(param for param in run["spec"]["params"] if param["name"] == "APP_IMAGE")["value"]
-    repo_url, image_name, image_tag = _app_image_to_parts(app_image=app_image)
-    status_data = _get_status_data(run)
+    run_details = _run_to_details(run=raw_run, k8s_client=k8s_client, verbose=verbose)
     if not json:
-        click.echo(_run_to_details_str(run=run, k8s_client=k8s_client))
+        click.echo(_run_to_details_str(run_details=run_details))
     else:
         click.echo(
             json_mod.dumps(
-                {
-                    "name": run["metadata"]["name"],
-                    "params": {
-                        "image_name": image_name,
-                        "image_tag": image_tag,
-                        "repo_url": repo_url,
-                    },
-                    "status": {
-                        "succeeded": status_data["status"],
-                        "message": status_data["message"],
-                        "reason": status_data["reason"],
-                    },
-                },
+                run_details,
                 indent=4,
             )
         )
