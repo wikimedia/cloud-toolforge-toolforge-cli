@@ -1,0 +1,3 @@
+#!/bin/bash
+
+echo -n "toolforge-debug: ${TOOLFORGE_DEBUG}"

@@ -95,7 +95,7 @@ bats_require_minimum_version 1.5.0
     [[ "$output" == "toolforge-params: -h one two --other=one" ]]
 }
 
-@test "TOOLFORGE_DEBUG env variable is being set correctly" {
+@test "TOOLFORGE_VERBOSE env variable is being set correctly" {
     export PATH=$BATS_TEST_DIRNAME/fixtures/echo_verbose_env:$PATH
 
     run toolforge --help
@@ -111,5 +111,57 @@ bats_require_minimum_version 1.5.0
     run toolforge --verbose verbose-env
 
     [[ "$status" == "0" ]]
+    [[ "$output" =~ "toolforge-verbose: 1" ]]
+}
+
+@test "TOOLFORGE_DEBUG env variable is being set correctly" {
+    export PATH=$BATS_TEST_DIRNAME/fixtures/echo_debug_env:$PATH
+
+    run toolforge --help
+
+    [[ "$status" == "0" ]]
+    [[ "$output" =~ .*^\ *debug-env ]]
+
+    run toolforge debug-env
+
+    [[ "$status" == "0" ]]
+    [[ "$output" =~ "toolforge-debug: 0" ]]
+
+    run toolforge --debug debug-env
+
+    [[ "$status" == "0" ]]
+    [[ "$output" =~ "toolforge-debug: 1" ]]
+}
+
+@test "TOOLFORGE_DEBUG and TOOLFORGE_VERBOSE env variables are not affected by the other" {
+    export PATH=$BATS_TEST_DIRNAME/fixtures/echo_debug_and_verbose_env:$PATH
+
+    run toolforge --help
+
+    [[ "$status" == "0" ]]
+    [[ "$output" =~ .*^\ *debug-and-verbose-env ]]
+
+    run toolforge debug-and-verbose-env
+
+    [[ "$status" == "0" ]]
+    [[ "$output" =~ "toolforge-debug: 0" ]]
+    [[ "$output" =~ "toolforge-verbose: 0" ]]
+
+    run toolforge --debug debug-and-verbose-env
+
+    [[ "$status" == "0" ]]
+    [[ "$output" =~ "toolforge-debug: 1" ]]
+    [[ "$output" =~ "toolforge-verbose: 0" ]]
+
+    run toolforge --verbose debug-and-verbose-env
+
+    [[ "$status" == "0" ]]
+    [[ "$output" =~ "toolforge-debug: 0" ]]
+    [[ "$output" =~ "toolforge-verbose: 1" ]]
+
+    run toolforge --debug --verbose debug-and-verbose-env
+
+    [[ "$status" == "0" ]]
+    [[ "$output" =~ "toolforge-debug: 1" ]]
     [[ "$output" =~ "toolforge-verbose: 1" ]]
 }

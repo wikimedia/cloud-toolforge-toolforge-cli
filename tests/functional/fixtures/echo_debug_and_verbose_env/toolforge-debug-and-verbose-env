@@ -1,3 +1,4 @@
 #!/bin/bash
 
+echo -n "toolforge-debug: ${TOOLFORGE_DEBUG}"
 echo -n "toolforge-verbose: ${TOOLFORGE_VERBOSE}"

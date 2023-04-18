@@ -352,10 +352,11 @@ def _app_image_to_parts(app_image: str) -> Tuple[str, str, str]:
     return (repo, image_name, tag)
 
 
-def _run_external_command(*args, binary: str, verbose: bool = False) -> None:
+def _run_external_command(*args, binary: str, verbose: bool = False, debug: bool = False) -> None:
     env = os.environ.copy()
     cmd = [binary, *args]
-    env["TOOLFORGE_DEBUG"] = "1" if verbose else "0"
+    env["TOOLFORGE_VERBOSE"] = "1" if verbose else "0"
+    env["TOOLFORGE_DEBUG"] = "1" if debug else "0"
 
     LOGGER.debug(f"Running command: {cmd}")
     proc = subprocess.Popen(
@@ -398,9 +399,10 @@ def _add_discovered_subcommands(cli: click.Group, config: Config) -> click.Group
         @click.pass_context
         def _new_command(ctx, args, help: bool, bin_path: str = bin_path):  # noqa
             verbose = ctx.obj.get("verbose", False)
+            debug = ctx.obj.get("debug", False)
             if help:
                 args = ["--help"] + list(args)
-            _run_external_command(*args, verbose=verbose, binary=bin_path)
+            _run_external_command(*args, verbose=verbose, debug=debug, binary=bin_path)
 
     return cli
 
@@ -437,10 +439,17 @@ def generate_default_image_name() -> str:
     help="Show extra verbose output. NOTE: Do no rely on the format of the verbose output",
     is_flag=True
 )
+@click.option(
+    "-d",
+    "--debug",
+    help="show logs to debug the toolforge-* packages. For extra verbose output for say build or job, see --verbose",
+    is_flag=True
+)
 @click.pass_context
-def toolforge(ctx: click.Context, verbose: bool) -> None:
+def toolforge(ctx: click.Context, verbose: bool, debug: bool) -> None:
     ctx.ensure_object(dict)
     ctx.obj["verbose"] = verbose
+    ctx.obj["debug"] = debug
     ctx.obj["config"] = get_loaded_config()
     pass
 
@@ -742,7 +751,7 @@ def build_show(ctx, run_name: str, kubeconfig: Path, json: bool) -> None:
 def main() -> int:
     # this is needed to setup the logging before the subcommand discovery
     res = toolforge.parse_args(ctx=click.Context(command=toolforge), args=sys.argv)
-    if "-v" in res or "--verbose" in res:
+    if "-d" in res or "--debug" in res:
         logging.basicConfig(level=logging.DEBUG)
     else:
         logging.basicConfig(level=logging.INFO)
