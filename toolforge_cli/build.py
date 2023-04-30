@@ -1,6 +1,8 @@
 from copy import deepcopy
 from typing import Any, Dict, Optional
 
+HARBOR_TOOLFORGE_PROJECT_PREFIX = "tool"
+
 ERROR_STRINGS = {
     "SERVICE_DOWN_ERROR": (
         "The build service seems to be down – please retry in a few minutes.\nIf the problem persists, "
@@ -40,7 +42,7 @@ def get_app_image_url(
     image_tag: str = "latest",
     image_repository: str = "harbor.toolforge.org",
 ):
-    return f"{image_repository}/{user}/{image_name}:{image_tag}"
+    return f"{image_repository}/{HARBOR_TOOLFORGE_PROJECT_PREFIX}-{user}/{image_name}:{image_tag}"
 
 
 def get_pipeline_run_spec(

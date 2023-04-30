@@ -17,14 +17,14 @@ def pipeline_run_spec():
 def test_get_app_image_url_image_repository_defaults_to_harbor():
     assert (
         get_app_image_url(image_name="dummy-image", user="dummy-user", image_tag="dummy-tag")
-        == "harbor.toolforge.org/dummy-user/dummy-image:dummy-tag"
+        == "harbor.toolforge.org/tool-dummy-user/dummy-image:dummy-tag"
     )
 
 
 def test_get_app_image_url_default_tag_defaults_to_latest():
     assert (
         get_app_image_url(image_name="dummy-image", user="dummy-user", image_repository="dummy-repo")
-        == "dummy-repo/dummy-user/dummy-image:latest"
+        == "dummy-repo/tool-dummy-user/dummy-image:latest"
     )
 
 

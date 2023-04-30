@@ -36,6 +36,15 @@ def _get_build_k8s(kubeconfig: Path) -> K8sAPIClient:
     return K8sAPIClient.from_file(kubeconfig=kubeconfig, namespace=config.build.build_service_namespace)
 
 
+def generate_default_image_name() -> str:
+    """Get the default project.
+
+    Currently that matches the tool account name, and the unix user, we might want to change the way we detect that
+    once we have a public API.
+    """
+    return f"{toolforge_build.HARBOR_TOOLFORGE_PROJECT_PREFIX}-{Path('~').expanduser().absolute().name}"
+
+
 def _execute_k8s_client_method(method, kwargs: Dict[str, Any]):
     try:
         return method(**kwargs)
@@ -422,15 +431,6 @@ def shared_build_options(func: Callable) -> Callable:
     return wrapper
 
 
-def generate_default_image_name() -> str:
-    """Get the default project.
-
-    Currently that matches the tool account name, and the unix user, we might want to change the way we detect that
-    once we have a public API.
-    """
-    return Path("~").expanduser().absolute().name
-
-
 @click.version_option()
 @click.group(name="toolforge", help="Toolforge command line")
 @click.option(
@@ -513,7 +513,10 @@ def build_start(
 
     k8s_client = _get_build_k8s(kubeconfig=kubeconfig)
     app_image = toolforge_build.get_app_image_url(
-        image_name=image_name, image_tag=image_tag, image_repository=dest_repository, user=k8s_client.user
+        image_name=image_name,
+        image_tag=image_tag,
+        image_repository=dest_repository,
+        user=k8s_client.user,
     )
     pipeline_run_spec = toolforge_build.get_pipeline_run_spec(
         source_url=source_git_url,
