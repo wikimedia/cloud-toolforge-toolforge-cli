@@ -1,3 +1,24 @@
+toolforge-cli (0.2.9) buster; urgency=medium
+
+  [ David Caro ]
+  * [ad4a85e] config: add a config module to load defaults from files
+
+  [ Slavina Stefanova ]
+  * [1205c6f] cli: typo fixes
+
+  [ Raymond Ndibe ]
+  * [75ed92b] toolforge-cli: improve error handling of _execute_k8s_client_method
+  * [2071ec8] toolforge-cli.build.show: less details when --verbose is false
+  * [74bb22a] toolforge-cli: seperate debug from verbose
+
+  [ David Caro ]
+  * [9b7f47c] tox: don't fail if the keyring is not loaded on linux
+
+  [ Raymond Ndibe ]
+  * [4b3fee8] cli: add tool- prefix
+
+ -- Raymond Ndibe <rolisaemeka-ctr@wikimedia.org>  Mon, 01 May 2023 22:55:25 +0000
+
 toolforge-cli (0.2.8) buster; urgency=medium
 
   [ David Caro ]
