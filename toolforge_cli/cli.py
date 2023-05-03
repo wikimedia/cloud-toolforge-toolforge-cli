@@ -432,7 +432,7 @@ def shared_build_options(func: Callable) -> Callable:
     return wrapper
 
 
-@click.version_option()
+@click.version_option(prog_name="Toolforge CLI")
 @click.group(name="toolforge", help="Toolforge command line")
 @click.option(
     "-v",
