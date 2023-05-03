@@ -364,6 +364,7 @@ def _app_image_to_parts(app_image: str) -> Tuple[str, str, str]:
 def _run_external_command(*args, binary: str, verbose: bool = False, debug: bool = False) -> None:
     env = os.environ.copy()
     cmd = [binary, *args]
+    env["TOOLFORGE_CLI"] = "1"
     env["TOOLFORGE_VERBOSE"] = "1" if verbose else "0"
     env["TOOLFORGE_DEBUG"] = "1" if debug else "0"
 
