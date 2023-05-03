@@ -420,10 +420,9 @@ def _add_discovered_subcommands(cli: click.Group, config: Config) -> click.Group
 def shared_build_options(func: Callable) -> Callable:
     @click.option(
         "--kubeconfig",
-        help="Path to the kubeconfig file.",
+        hidden=True,
         default=Path(os.environ.get("KUBECONFIG", "~/.kube/config")),
         type=Path,
-        show_default=True,
     )
     @wraps(func)
     def wrapper(*args, **kwargs) -> Callable:
