@@ -3,6 +3,7 @@ Originally copied from
 https://github.com/wikimedia/cloud-toolforge-jobs-framework-api/blob/main/common/k8sclient.py
 """
 import json
+import os
 from pathlib import Path
 from typing import Any, Dict, List, Optional, cast
 
@@ -64,12 +65,18 @@ class K8sAPIClient:
     @classmethod
     def from_file(cls, kubeconfig: Path, namespace: Optional[str] = None) -> "K8sAPIClient":
         """Create a client from a kubeconfig file."""
+        # load the relative paths in kubeconfig as relative to the file, just like the
+        # official libraries
+        old_dir = os.curdir
+        os.chdir(str(kubeconfig.parent.expanduser()))
         with kubeconfig.expanduser().open() as f:
             config = yaml.safe_load(f.read())
         try:
             return cls(config=config, namespace=namespace)
         except Exception as error:
             raise BadConfig(f"Got an error parsing the config {kubeconfig}") from error
+        finally:
+            os.chdir(old_dir)
 
     @staticmethod
     def _get_context_to_use(contexts: List[Dict[str, Any]], current_context_name: str) -> Dict[str, Any]:
@@ -122,7 +129,10 @@ class K8sAPIClient:
         self.user = self._get_user_from_cert(cert_path=Path(self.kubectl_user["client-certificate"]))
         self.org_name = self._get_org_name_from_cert(cert_path=Path(self.kubectl_user["client-certificate"]))
         self.session = requests.Session()
-        self.session.cert = (self.kubectl_user["client-certificate"], self.kubectl_user["client-key"])
+        self.session.cert = (
+            os.path.realpath(self.kubectl_user["client-certificate"]),
+            os.path.realpath(self.kubectl_user["client-key"]),
+        )
         # T253412: We are deliberately not validating the api endpoint's TLS
         # certificate. The only way to do this with a self-signed cert is to
         # pass the path to a CA bundle. We actually *can* do that, but with
