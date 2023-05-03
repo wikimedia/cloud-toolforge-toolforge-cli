@@ -163,7 +163,7 @@ def _get_status_data_lines(status_data: Dict[str, Any]) -> List[str]:
         status_color = "yellow"
 
     end_time = click.style(end_time, fg="green") if end_time == "running" else end_time
-    status = f"{click.style(status, fg=status_color)}({reason})"
+    status = f"{click.style(status, fg=status_color)} ({reason})"
 
     status_data_lines.append(f"{click.style('Start time:', bold=True)} {start_time}")
     status_data_lines.append(f"{click.style('End time:', bold=True)} {end_time}")
@@ -217,7 +217,7 @@ def _get_init_containers_details_lines(init_containers: List[Dict[str, Any]]) ->
     for init_container in init_containers:
         init_containers_lines.append(
             f"{click.style('Init-container:', bold=True)} {init_container['name']} - "
-            f"{status[init_container['status']]}({init_container['reason']})"
+            f"{status[init_container['status']]} ({init_container['reason']})"
         )
 
     return init_containers_lines
@@ -262,7 +262,7 @@ def _get_step_details_lines(steps: List[Dict[str, Any]]) -> List[str]:
 
     for step in steps:
         steps_details_lines.append(
-            f"{click.style('Step:', bold=True)} {step['name']} - {status[step['status']]}({step['reason']})"
+            f"{click.style('Step:', bold=True)} {step['name']} - {status[step['status']]} ({step['reason']})"
         )
 
     return steps_details_lines
