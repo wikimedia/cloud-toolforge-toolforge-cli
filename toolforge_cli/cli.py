@@ -751,6 +751,15 @@ def build_show(ctx, run_name: str, kubeconfig: Path, json: bool) -> None:
         )
 
 
+@toolforge.command(name="_commands", hidden=True)
+def internal_commands():
+    """Used internally for tab completion."""
+    for name, command in sorted(toolforge.commands.items()):
+        if command.hidden:
+            continue
+        click.echo(name)
+
+
 def main() -> int:
     # this is needed to setup the logging before the subcommand discovery
     res = toolforge.parse_args(ctx=click.Context(command=toolforge), args=sys.argv)

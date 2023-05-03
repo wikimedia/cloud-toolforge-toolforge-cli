@@ -1,0 +1,29 @@
+_toolforge() {
+	local cur="${COMP_WORDS[COMP_CWORD]}"
+
+	local had_subcommand=false
+	local i=1
+
+	while ((i<$COMP_CWORD)); do
+		if [[ "${COMP_WORDS[i]}" != -* ]]; then
+			had_subcommand=true
+			break
+		fi
+
+		((++i))
+	done
+
+	if ! $had_subcommand; then
+		if [[ $cur == -* ]]; then
+			local global_args=(-d --debug --help --version)
+			COMPREPLY=($(compgen -W "${global_args}" -- ${cur}))
+		else
+			local subcommands=$(toolforge _commands)
+			COMPREPLY=($(compgen -W "${subcommands}" -- ${cur}))
+		fi
+	fi
+
+	# TODO: tab complete the subcommands too
+}
+
+complete -F _toolforge toolforge

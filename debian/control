@@ -2,7 +2,8 @@ Source: toolforge-cli
 Section: admin
 Priority: optional
 Maintainer: Wikimedia Cloud Services <cloudservices@wikimedia.org>
-Build-Depends: debhelper-compat (= 12),
+Build-Depends: bash-completion,
+               debhelper-compat (= 12),
                dh-exec,
                dh-python,
                python3-all,
