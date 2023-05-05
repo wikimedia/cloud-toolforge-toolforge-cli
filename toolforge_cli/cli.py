@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Tuple, cast
 
 import click
+from tabulate import tabulate
 
 import toolforge_cli.build as toolforge_build
 from toolforge_cli.config import Config, load_config
@@ -43,6 +44,10 @@ def generate_default_image_name() -> str:
     once we have a public API.
     """
     return f"{toolforge_build.HARBOR_TOOLFORGE_PROJECT_PREFIX}-{Path('~').expanduser().absolute().name}"
+
+
+def _format_headers(headers: List[str]) -> List[str]:
+    return [click.style(item, bold=True) for item in headers]
 
 
 def _execute_k8s_client_method(method, kwargs: Dict[str, Any]):
@@ -119,7 +124,7 @@ def _get_run_data(run: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
-def _run_to_short_str(run_data: Dict[str, Any]) -> str:
+def _run_to_list_entry(run_data: Dict[str, Any]) -> List[Any]:
     status_style = {
         "not started": click.style("not started", fg="white"),
         "ok": click.style("ok", fg="green"),
@@ -140,10 +145,18 @@ def _run_to_short_str(run_data: Dict[str, Any]) -> str:
     start_time = run_data["start_time"]
     end_time = run_data["end_time"]
 
-    return (
-        f"{run_name}\t{status}\t{start_time}\t{end_time}\t{source_url}\t{ref}\t{repo_url}\t{image_name}"
-        f"\t{image_tag}\t{builder_image}"
-    )
+    return [
+        run_name,
+        status,
+        start_time,
+        end_time,
+        source_url,
+        ref,
+        repo_url,
+        image_name,
+        image_tag,
+        builder_image,
+    ]
 
 
 def _get_status_data_lines(status_data: Dict[str, Any]) -> List[str]:
@@ -570,23 +583,34 @@ def build_list(kubeconfig: Path, json: bool) -> None:
     method_kwargs = {"kind": "pipelineruns", "selector": f"user={k8s_client.user}"}
     runs = _execute_k8s_client_method(method=k8s_client.get_objects, kwargs=method_kwargs)
 
-    if not json:
-        click.echo(
-            click.style(
-                (
-                    "run_name\tstatus\tstart_time\tend_time\tsource_url\tref\trepo_url\timage_name\timage_tag"
-                    "\tbuilder_image"
-                ),
-                bold=True,
-            ),
-        )
+    run_datas = [
+        _get_run_data(run=run)
+        for run in sorted(runs, key=lambda run: run["metadata"]["creationTimestamp"], reverse=True)
+    ]
 
-    for run in sorted(runs, key=lambda run: run["metadata"]["creationTimestamp"], reverse=True):
-        run_data = _get_run_data(run=run)
-        if json:
+    if json:
+        for run_data in run_datas:
             click.echo(json_mod.dumps(run_data, indent=4))
-        else:
-            click.echo(_run_to_short_str(run_data))
+        return
+
+    click.echo(
+        tabulate(
+            [_run_to_list_entry(run_data=run_data) for run_data in run_datas],
+            headers=_format_headers([
+                "run_image",
+                "status",
+                "start_time",
+                "end_time",
+                "source_url",
+                "ref",
+                "repo_url",
+                "image_name",
+                "image_tag",
+                "builder_image",
+            ]),
+            tablefmt="plain",
+        )
+    )
 
 
 @build.command(name="cancel", help="Cancel a running build (does nothing for stopped ones)")

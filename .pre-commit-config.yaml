@@ -28,7 +28,7 @@ repos:
         exclude: ^tests/
         verbose: true
         args: [--show-error-codes]
-        additional_dependencies: ['types-click', 'types-requests', 'types-PyYAML', 'types-cryptography', 'types-setuptools']
+        additional_dependencies: ['types-click', 'types-requests', 'types-PyYAML', 'types-cryptography', 'types-setuptools', 'types-tabulate']
 
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v4.4.0
