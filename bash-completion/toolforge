@@ -1,3 +1,22 @@
+__toolforge_complete_command () {
+	# adapted from git's bash completion
+	local command="$1"
+	local completion_func="_toolforge_${command//-/_}"
+	if ! declare -f $completion_func >/dev/null 2>/dev/null &&
+		declare -f _completion_loader >/dev/null 2>/dev/null
+	then
+		_completion_loader "toolforge-$command"
+	fi
+
+	if declare -f $completion_func >/dev/null 2>/dev/null
+	then
+		$completion_func
+		return 0
+	else
+		return 1
+	fi
+}
+
 _toolforge() {
 	local cur="${COMP_WORDS[COMP_CWORD]}"
 
@@ -15,15 +34,16 @@ _toolforge() {
 
 	if ! $had_subcommand; then
 		if [[ $cur == -* ]]; then
-			local global_args=(-d --debug --help --version)
-			COMPREPLY=($(compgen -W "${global_args}" -- ${cur}))
+			COMPREPLY=($(compgen -W "-d --debug --help --version" -- ${cur}))
 		else
-			local subcommands=$(toolforge _commands)
-			COMPREPLY=($(compgen -W "${subcommands}" -- ${cur}))
+			COMPREPLY=($(compgen -W "$($1 _commands)" -- ${cur}))
 		fi
+
+		return
 	fi
 
-	# TODO: tab complete the subcommands too
+	export TOOLFORGE_CLI=1
+	__toolforge_complete_command "${COMP_WORDS[1]}"
 }
 
 complete -F _toolforge toolforge
