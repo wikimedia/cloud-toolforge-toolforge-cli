@@ -490,15 +490,13 @@ def build():
 )
 @click.option(
     "--builder-image",
-    help="This is the image identifier for the buildpack builder, without protocol (no http/https)",
     default=get_loaded_config().build.builder_image,
-    show_default=True,
+    hidden=True,
 )
 @click.option(
     "--dest-repository",
-    help="FQDN to the OCI repository to push the image to, without the protocol (no http/https)",
     default=get_loaded_config().build.dest_repository,
-    show_default=True,
+    hidden=True,
 )
 @click.option(
     "--ref",
