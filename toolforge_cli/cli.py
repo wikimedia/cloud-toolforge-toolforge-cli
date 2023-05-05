@@ -58,18 +58,12 @@ def _execute_k8s_client_method(method, kwargs: Dict[str, Any]):
     sys.exit(1)
 
 
-def _run_is_ok(status_data: Dict[str, Any]) -> bool:
-    return status_data["status"] == "True" or status_data["reason"] == "Running"
-
-
-def _run_has_failed(status_data: Dict[str, Any]) -> bool:
-    return status_data["status"] == "False"
-
-
 def _get_run_status(status_data: Dict[str, str]) -> str:
-    if _run_is_ok(status_data):
+    if status_data["status"] == "Unknown" and status_data["reason"] == "Running":
+        return "running"
+    if status_data["status"] == "True":
         return "ok"
-    elif _run_has_failed(status_data):
+    elif status_data["status"] == "False":
         if status_data["reason"].endswith("Cancelled"):
             return "cancelled"
         else:
@@ -88,12 +82,12 @@ def _get_status_data(run: Dict[str, Any]) -> Dict[str, str]:
 
     if info:
         start_time = run["status"]["startTime"]
-        end_time = run["status"].get("completionTime", "running")
+        end_time = run["status"].get("completionTime", "N/A")
         status = _get_run_status(info)
         reason = info["reason"]
         message = info["message"]
     else:
-        start_time = "pending"
+        start_time = "N/A"
         status = "not started"
         end_time = reason = message = "N/A"
 
@@ -127,6 +121,7 @@ def _get_run_data(run: Dict[str, Any]) -> Dict[str, Any]:
 def _run_to_list_entry(run_data: Dict[str, Any]) -> List[Any]:
     status_style = {
         "not started": click.style("not started", fg="white"),
+        "running": click.style("running", fg="yellow"),
         "ok": click.style("ok", fg="green"),
         "cancelled": click.style("cancelled", fg="green"),
         "error": click.style("error", fg="red"),
@@ -134,7 +129,7 @@ def _run_to_list_entry(run_data: Dict[str, Any]) -> List[Any]:
 
     run_name = run_data["name"]
     status_name = run_data["status"]
-    status = status_style.get(status_name, click.style(status_name, fg="yellow"))
+    status = status_style.get(status_name, f"{click.style(status_name, fg='yellow')}")
     params = run_data["params"]
     source_url = params["source_url"]
     ref = params["ref"]
@@ -162,26 +157,25 @@ def _run_to_list_entry(run_data: Dict[str, Any]) -> List[Any]:
 def _get_status_data_lines(status_data: Dict[str, Any]) -> List[str]:
     status_data_lines = []
 
-    start_time = status_data["start_time"]
-    end_time = status_data["end_time"]
-    status = status_data["status"]
-    reason = status_data["reason"]
-    message = status_data["message"]
+    status_style = {
+        "not started": click.style("not started", fg="white"),
+        "running": click.style("running", fg="yellow"),
+        "ok": click.style("ok", fg="green"),
+        "cancelled": click.style("cancelled", fg="green"),
+        "error": click.style("error", fg="red"),
+    }
 
-    if status == "ok" or status == "cancelled":
-        status_color = "green"
-    elif status == "error":
-        status_color = "red"
-    else:
-        status_color = "yellow"
+    status_name = status_data["status"]
 
-    end_time = click.style(end_time, fg="green") if end_time == "running" else end_time
-    status = f"{click.style(status, fg=status_color)} ({reason})"
+    status = status_style.get(status_name, click.style(status_name, fg="yellow"))
 
-    status_data_lines.append(f"{click.style('Start time:', bold=True)} {start_time}")
-    status_data_lines.append(f"{click.style('End time:', bold=True)} {end_time}")
+    if status_name != "running":
+        status += f" ({status_data['reason']})"
+
+    status_data_lines.append(f"{click.style('Start time:', bold=True)} {status_data['start_time']}")
+    status_data_lines.append(f"{click.style('End time:', bold=True)} {status_data['end_time']}")
     status_data_lines.append(f"{click.style('Status:', bold=True)} {status}")
-    status_data_lines.append(f"{click.style('Message:', bold=True)} {message}")
+    status_data_lines.append(f"{click.style('Message:', bold=True)} {status_data['message']}")
 
     return status_data_lines
 
@@ -264,18 +258,18 @@ def _get_step_details(steps) -> List[Dict[str, Any]]:
 
 def _get_step_details_lines(steps: List[Dict[str, Any]]) -> List[str]:
     steps_details_lines = []
-    status = {
-        "ok": click.style("ok", fg="green"),
+    status_style = {
         "waiting": click.style("waiting", fg="white"),
-        "running": click.style("running", fg="white"),
+        "ok": click.style("ok", fg="green"),
         "cancelled": click.style("cancelled", fg="green"),
+        "running": click.style("running", fg="yellow"),
         "error": click.style("error", fg="red"),
-        "unknown": click.style("unknown", fg="yellow"),
     }
 
     for step in steps:
+        status = status_style.get(step["status"], click.style(step["status"], fg="yellow"))
         steps_details_lines.append(
-            f"{click.style('Step:', bold=True)} {step['name']} - {status[step['status']]} ({step['reason']})"
+            f"{click.style('Step:', bold=True)} {step['name']} - {status} ({step['reason']})"
         )
 
     return steps_details_lines

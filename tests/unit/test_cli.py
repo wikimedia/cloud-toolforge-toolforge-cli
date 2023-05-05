@@ -38,6 +38,11 @@ def pipeline_run_without_status():
     return _get_run_from_pipeline_k8s_object(FIXTURES_PATH / "pipeline_without_status.json")
 
 
+@pytest.fixture
+def uncompleted_pipeline_run():
+    return _get_run_from_pipeline_k8s_object(FIXTURES_PATH / "pipeline_uncompleted_run.json")
+
+
 def test__get_status_data_from_sucessful_pipeline_run(successful_pipeline_run):
     actual = _get_status_data(successful_pipeline_run)
     expected = {
@@ -64,7 +69,19 @@ def test__get_status_data_from_failed_pipeline_run(oom_pipeline_run):
 
 def test__get_status_data_from_pipeline_run_without_status(pipeline_run_without_status):
     actual = _get_status_data(pipeline_run_without_status)
-    expected = {"start_time": "pending", "end_time": "N/A", "status": "not started", "reason": "N/A", "message": "N/A"}
+    expected = {"start_time": "N/A", "end_time": "N/A", "status": "not started", "reason": "N/A", "message": "N/A"}
+    assert actual == expected
+
+
+def test__get_status_data_from_pipeline_with_uncompleted_run(uncompleted_pipeline_run):
+    actual = _get_status_data(uncompleted_pipeline_run)
+    expected = {
+        "start_time": "2023-05-05T01:56:53Z",
+        "end_time": "N/A",
+        "status": "running",
+        "reason": "Running",
+        "message": "Tasks Completed: 0 (Failed: 0, Cancelled 0), Incomplete: 1, Skipped: 0"
+    }
     assert actual == expected
 
 
@@ -114,7 +131,7 @@ def test__get_run_data_from_pipeline_run_without_status(pipeline_run_without_sta
     actual = _get_run_data(pipeline_run_without_status)
     expected = {
         "name": "minikube-user-buildpacks-pipelinerun-mkgjp",
-        "start_time": "pending",
+        "start_time": "N/A",
         "end_time": "N/A",
         "status": "not started",
         "reason": "N/A",
@@ -126,6 +143,27 @@ def test__get_run_data_from_pipeline_run_without_status(pipeline_run_without_sta
             "source_url": "https://github.com/david-caro/wm-lol",
             "builder_image": "docker-registry.tools.wmflabs.org/toolforge-bullseye0-builder",
             "ref": "upstream_buildpacks",
+        }
+    }
+    assert actual == expected
+
+
+def test__get_run_data_from_pipeline_run_with_uncompleted_run(uncompleted_pipeline_run):
+    actual = _get_run_data(uncompleted_pipeline_run)
+    expected = {
+        "name": "minikube-user-buildpacks-pipelinerun-5txnc",
+        "start_time": "2023-05-05T01:56:53Z",
+        "end_time": "N/A",
+        "status": "running",
+        "reason": "Running",
+        "message": "Tasks Completed: 0 (Failed: 0, Cancelled 0), Incomplete: 1, Skipped: 0",
+        "params": {
+            "image_name": "tool-raymond",
+            "image_tag": "latest",
+            "repo_url": "192.168.188.129/tool-minikube-user",
+            "source_url": "https://github.com/david-caro/wm-lol",
+            "builder_image": "toolsbeta-harbor.wmcloud.org/toolforge/heroku-builder-classic:22",
+            'ref': 'no ref'
         }
     }
     assert actual == expected
@@ -214,6 +252,55 @@ def test__get_task_details_from_pipeline_run_without_steps(oom_pipeline_run):
                         'step-results was using 6756Ki, which exceeds its request of 0. '
                         'Container step-build was using 26352Ki, which exceeds its request '
                         'of 0. ',
+        }
+    ]
+
+    assert actual_str == expected_str
+    assert actual_json == expected_json
+
+
+def test__get_task_details_from_pipeline_with_uncompleted_run(uncompleted_pipeline_run):
+    k8s_client = Mock()
+    actual_json = _get_task_details(uncompleted_pipeline_run, k8s_client)
+    actual_str = _get_task_details_lines(actual_json)
+    expected_str = [
+        "\x1b[1mTask:\x1b[0m build-from-git",
+        "    \x1b[1mStart time:\x1b[0m 2023-05-05T01:56:53Z",
+        "    \x1b[1mEnd time:\x1b[0m N/A",
+        "    \x1b[1mStatus:\x1b[0m \x1b[33mrunning\x1b[0m",
+        "    \x1b[1mMessage:\x1b[0m Not all Steps in the Task have finished executing",
+        "",
+        "\x1b[1m    Steps:\x1b[0m",
+        "        \x1b[1mStep:\x1b[0m clone - \x1b[32mok\x1b[0m (Completed)",
+        "        \x1b[1mStep:\x1b[0m prepare - \x1b[32mok\x1b[0m (Completed)",
+        "        \x1b[1mStep:\x1b[0m copy-stack-toml - \x1b[32mok\x1b[0m (Completed)",
+        "        \x1b[1mStep:\x1b[0m detect - \x1b[32mok\x1b[0m (Completed)",
+        "        \x1b[1mStep:\x1b[0m analyze - \x1b[32mok\x1b[0m (Completed)",
+        "        \x1b[1mStep:\x1b[0m restore - \x1b[32mok\x1b[0m (Completed)",
+        "        \x1b[1mStep:\x1b[0m build - \x1b[33mrunning\x1b[0m (started at [2023-05-05T01:57:21Z])",
+        "        \x1b[1mStep:\x1b[0m export - \x1b[33mrunning\x1b[0m (started at [2023-05-05T01:57:24Z])",
+        "        \x1b[1mStep:\x1b[0m results - \x1b[33mrunning\x1b[0m (started at [2023-05-05T01:57:24Z])",
+        "",
+    ]
+    expected_json = [
+        {
+            'task_name': 'build-from-git',
+            'start_time': '2023-05-05T01:56:53Z',
+            'end_time': 'N/A',
+            'status': 'running',
+            'reason': 'Running',
+            'message': 'Not all Steps in the Task have finished executing',
+            'steps': [
+                {'name': 'clone', 'reason': 'Completed', 'status': 'ok'},
+                {'name': 'prepare', 'reason': 'Completed', 'status': 'ok'},
+                {'name': 'copy-stack-toml', 'reason': 'Completed', 'status': 'ok'},
+                {'name': 'detect', 'reason': 'Completed', 'status': 'ok'},
+                {'name': 'analyze', 'reason': 'Completed', 'status': 'ok'},
+                {'name': 'restore', 'reason': 'Completed', 'status': 'ok'},
+                {'name': 'build', 'reason': 'started at [2023-05-05T01:57:21Z]', 'status': 'running'},
+                {'name': 'export', 'reason': 'started at [2023-05-05T01:57:24Z]', 'status': 'running'},
+                {'name': 'results', 'reason': 'started at [2023-05-05T01:57:24Z]', 'status': 'running'}
+            ],
         }
     ]
 
