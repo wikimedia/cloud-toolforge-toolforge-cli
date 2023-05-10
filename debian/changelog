@@ -1,3 +1,9 @@
+toolforge-cli (0.2.11) buster; urgency=medium
+
+  * [3d680c4] debian: do not exclude packaging files
+
+ -- Taavi Väänänen <hi@taavi.wtf>  Wed, 10 May 2023 15:37:26 +0300
+
 toolforge-cli (0.2.10) buster; urgency=medium
 
   [ David Caro ]
