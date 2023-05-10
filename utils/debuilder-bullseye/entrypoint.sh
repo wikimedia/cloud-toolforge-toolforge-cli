@@ -26,6 +26,7 @@ apt-get \
     .
 
 debuild -uc -us
+dh clean
 
 rm -rf build
 mkdir build
