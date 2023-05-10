@@ -1,3 +1,23 @@
+toolforge-cli (0.2.10) buster; urgency=medium
+
+  [ David Caro ]
+  * [0d586af] Allow for relative paths to kubeconfig certs
+
+  [ Taavi Väänänen ]
+  * [5ab3d8e] cli: Add env variable to detect cli wrapper usage
+  * [72e0535] cli: Set program name in --version output
+  * [d0c2e0b] cli: hide --kubeconfig from help
+  * [5ff8b8e] Tab complete commands
+  * [001aa93] cli: add missing spaces
+  * [630fa9b] cli: use tabulate for build listing
+  * [17fe108] Tab complete toolforge build subcommands
+  * [847484e] toolforge_cli: Hide repository argument from help
+
+  [ Raymond Ndibe ]
+  * [92aced3] toolforge-cli: improve build_show and build_list outputs
+
+ -- Francesco Negri <fnegri@wikimedia.org>  Wed, 10 May 2023 08:23:50 +0000
+
 toolforge-cli (0.2.9) buster; urgency=medium
 
   [ David Caro ]
