@@ -28,20 +28,34 @@ class BuildConfig:
     builder_image: str = "tools-harbor.wmcloud.org/toolforge/heroku-builder-classic:22"
     build_service_namespace: str = "image-build"
     admin_group_names: list[str] = field(default_factory=lambda: ["admins", "system:masters"])
+    builds_endpoint: str = "/builds/v1"
 
     @classmethod
-    def from_dict(cls, dict: dict[str, Any]):
-        return cls(**dict)
+    def from_dict(cls, my_dict: dict[str, Any]):
+        return cls(**my_dict)
+
+
+@dataclass(frozen=True)
+class ApiGatewayConfig:
+    url: str = "https://api.svc.tools.eqiad1.wikimedia.cloud:30003"
+
+    @classmethod
+    def from_dict(cls, my_dict: dict[str, Any]):
+        return cls(**my_dict)
 
 
 @dataclass(frozen=True)
 class Config:
     build: BuildConfig
+    api_gateway: ApiGatewayConfig
     toolforge_prefix: str = "toolforge-"
 
     @classmethod
-    def from_dict(cls, dict: dict[str, Any]):
-        return cls(build=BuildConfig.from_dict(dict.get("build", {})))
+    def from_dict(cls, my_dict: dict[str, Any]):
+        return cls(
+            build=BuildConfig.from_dict(my_dict.get("build", {})),
+            api_gateway=ApiGatewayConfig.from_dict(my_dict.get("api_gateway", {})),
+        )
 
 
 def load_config() -> Config:
@@ -61,6 +75,6 @@ def load_config() -> Config:
             LOGGER.debug("Unable to find config file %s, skipping", full_file)
 
     try:
-        return Config.from_dict(dict=config_dict)
+        return Config.from_dict(my_dict=config_dict)
     except Exception as error:
         raise LoadConfigError(f"Unable to load configuration from dict: {config_dict}") from error

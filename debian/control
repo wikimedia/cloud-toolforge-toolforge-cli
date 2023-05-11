@@ -10,6 +10,7 @@ Build-Depends: bash-completion,
                python3-setuptools,
                python3-poetry-core (>= 1.4),
                python3-cachecontrol,
+               python3-toolforge-weld (>=0.2.0),
                pybuild-plugin-pyproject
 Standards-Version: 4.5.1
 Homepage: https://toolforge.org

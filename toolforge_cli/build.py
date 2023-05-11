@@ -1,6 +1,7 @@
 from copy import deepcopy
 from typing import Any, Dict, Optional
 
+
 HARBOR_TOOLFORGE_PROJECT_PREFIX = "tool"
 
 ERROR_STRINGS = {

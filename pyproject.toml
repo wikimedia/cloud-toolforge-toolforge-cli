@@ -14,6 +14,7 @@ requests = "^2.27.1"
 urllib3 = "^1.26.8"
 cryptography = "^36.0.1"
 tabulate = "^0.9.0"
+toolforge-weld = "^0.1.0.1"
 
 [tool.poetry.plugins."console_scripts"]
 "toolforge" = "toolforge_cli.cli:main"

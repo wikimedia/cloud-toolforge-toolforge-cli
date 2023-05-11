@@ -12,6 +12,8 @@ from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Tuple, cast
 
 import click
+from toolforge_weld.api_client import ToolforgeClient
+from toolforge_weld.kubernetes_config import Kubeconfig
 from tabulate import tabulate
 
 import toolforge_cli.build as toolforge_build
@@ -19,6 +21,8 @@ from toolforge_cli.config import Config, load_config
 from toolforge_cli.k8sclient import K8sAPIClient, K8sError
 
 LOGGER = logging.getLogger("toolforge" if __name__ == "__main__" else __name__)
+
+USER_AGENT = "build logs"
 
 
 @lru_cache(maxsize=None)
@@ -541,26 +545,19 @@ def build_start(
     click.echo(message)
 
 
-@build.command(name="logs", help="Show the logs for a build (only admins for now)")
+@build.command(name="logs", help="Show the logs for a build")
 @click.argument("RUN_NAME")
 @shared_build_options
 def build_logs(run_name: str, kubeconfig: Path) -> None:
     config = _load_config_from_ctx()
-    k8s_client = _get_build_k8s(kubeconfig=kubeconfig)
-
-    if k8s_client.org_name in config.build.admin_group_names:
-        click.echo(
-            click.style(
-                "This feature is not yet available for non-admin users, but will be soon!",
-                fg="yellow",
-                bold=True,
-            ),
-        )
-        return
-
-    _run_external_command(
-        "pipelinerun", "logs", "--namespace", config.build.build_service_namespace, "-f", run_name, binary="tkn"
+    builds_client = ToolforgeClient(
+        kubeconfig=Kubeconfig.load(kubeconfig.expanduser().resolve()),
+        server=config.api_gateway.url + config.build.builds_endpoint,
+        user_agent=USER_AGENT,
     )
+    logs = builds_client.get(f"/build/{run_name}/logs")
+    for log in logs["lines"]:
+        click.echo(log)
 
 
 @build.command(name="list", help="List builds")

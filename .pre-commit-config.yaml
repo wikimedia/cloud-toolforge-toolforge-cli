@@ -17,7 +17,7 @@ repos:
         files: \.py$
 
   - repo: https://github.com/PyCQA/flake8
-    rev: 5.0.4  # do not update this until our CI runner uses Python >=3.8.1
+    rev: 5.0.4 # do not update this until our CI runner uses Python >=3.8.1
     hooks:
       - id: flake8
 
@@ -28,7 +28,16 @@ repos:
         exclude: ^tests/
         verbose: true
         args: [--show-error-codes]
-        additional_dependencies: ['types-click', 'types-requests', 'types-PyYAML', 'types-cryptography', 'types-setuptools', 'types-tabulate']
+        additional_dependencies:
+          [
+            "types-click",
+            "types-requests",
+            "types-PyYAML",
+            "types-cryptography",
+            "types-setuptools",
+            "types-tabulate",
+            "toolforge-weld",
+          ]
 
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v4.4.0
