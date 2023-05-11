@@ -84,6 +84,36 @@ dependencies. The next run it will not need to download all those dependencies, 
 
 **NOTE**: If it failed when installing packages, try passing `--no-cache` to force rebuilding the cached layers.
 
+#### wmcs-package-build script
+An alternative is using the wmcs-package-build.py script that you can find in
+the operations/puppet repo at modules/toolforge/files
+
+```
+$ ./wmcs-package-build.py --git-repo https://gerrit.wikimedia.org/r/cloud/toolforge/toolforge-cli -a buster-toolsbeta -a bullseye-toolsbeta --git-branch main --backports --toolforge-repo=tools --build-dist=bullseye
+```
+
+The script will SSH into a build server, build the package there, and publish it
+to two repos: `buster-toolsbeta` and `bullseye-tooslbeta`.
+
+The additional params `--backports, --toolforge-repo=tools
+--build-dist=bullseye` are necessary because the build requires Poetry and other
+build tools not available in the buster repos.
+
+If that command is successful, you should then copy the package from the
+"toolsbeta" to the "tools" distribution:
+
+```
+ssh tools-services-05.tools.eqiad1.wikimedia.cloud
+$ sudo -i
+# aptly repo copy buster-toolsbeta buster-tools toolforge-cli_VERSION_all
+# aptly repo copy bullseye-toolsbeta bullseye-tools toolforge-cli_VERSION_all
+# aptly publish --skip-signing update buster-tools
+# aptly publish --skip-signing update bullseye-tools
+```
+
+Additional documentation on the wmcs-package-build script is available at
+https://wikitech.wikimedia.org/wiki/Portal:Toolforge/Admin/Packaging#wmcs-package-build
+
 #### Manual process (only on debian)
 For this you'll need debuild installed:
 ```
