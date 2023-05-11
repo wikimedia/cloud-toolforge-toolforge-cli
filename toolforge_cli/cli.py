@@ -41,6 +41,16 @@ def _get_build_k8s(kubeconfig: Path) -> K8sAPIClient:
     return K8sAPIClient.from_file(kubeconfig=kubeconfig, namespace=config.build.build_service_namespace)
 
 
+def _get_last_build(k8s_client) -> Optional[dict[str, Any]]:
+    method_kwargs = {
+        "kind": "pipelineruns",
+        "selector": f"user={k8s_client.user}",
+    }
+    raw_runs = _execute_k8s_client_method(method=k8s_client.get_objects, kwargs=method_kwargs)
+    raw_runs = sorted(raw_runs, key=lambda raw_run: raw_run["metadata"]["creationTimestamp"], reverse=True)
+    return raw_runs[0] if len(raw_runs) > 0 else None
+
+
 def generate_default_image_name() -> str:
     """Get the default project.
 
@@ -118,7 +128,7 @@ def _get_run_data(run: Dict[str, Any]) -> Dict[str, Any]:
             "source_url": source_url,
             "ref": ref,
             "builder_image": builder_image,
-        }
+        },
     }
 
 
@@ -184,9 +194,7 @@ def _get_status_data_lines(status_data: Dict[str, Any]) -> List[str]:
     return status_data_lines
 
 
-def _get_init_containers_details(
-    run_name: str, task_name: str, k8s_client: K8sAPIClient
-) -> List[Dict[str, Any]]:
+def _get_init_containers_details(run_name: str, task_name: str, k8s_client: K8sAPIClient) -> List[Dict[str, Any]]:
     """Sometimes these fail before getting to any of the steps."""
     pod_name = f"{run_name}-{task_name}-pod"
     pod_data = k8s_client.get_object(kind="pods", name=pod_name)
@@ -272,9 +280,7 @@ def _get_step_details_lines(steps: List[Dict[str, Any]]) -> List[str]:
 
     for step in steps:
         status = status_style.get(step["status"], click.style(step["status"], fg="yellow"))
-        steps_details_lines.append(
-            f"{click.style('Step:', bold=True)} {step['name']} - {status} ({step['reason']})"
-        )
+        steps_details_lines.append(f"{click.style('Step:', bold=True)} {step['name']} - {status} ({step['reason']})")
 
     return steps_details_lines
 
@@ -285,10 +291,7 @@ def _get_task_details(run: Dict[str, Any], k8s_client: K8sAPIClient) -> List[Dic
     for task in run.get("status", {}).get("taskRuns", {}).values():
         status_data = _get_status_data(run=task)
 
-        task_details = {
-            "task_name": task["pipelineTaskName"],
-            **status_data
-        }
+        task_details = {"task_name": task["pipelineTaskName"], **status_data}
 
         # A task can fail before any steps are executed
         if "steps" in task["status"]:
@@ -300,8 +303,8 @@ def _get_task_details(run: Dict[str, Any], k8s_client: K8sAPIClient) -> List[Dic
             ):
                 # Sometimes the task fails in the init containers, so if that happened, show the errors there too
                 init_containers = _get_init_containers_details(
-                        run_name=run["metadata"]["name"], task_name=task["pipelineTaskName"], k8s_client=k8s_client
-                    )
+                    run_name=run["metadata"]["name"], task_name=task["pipelineTaskName"], k8s_client=k8s_client
+                )
                 task_details["init_containers"] = init_containers
         tasks_details.append(task_details)
 
@@ -328,10 +331,7 @@ def _get_task_details_lines(tasks_details: List[Dict[str, Any]]) -> List[str]:
             # Sometimes the task fails in the init containers, so if that happened, show the errors there too
             init_containers_lines = _get_init_containers_details_lines(init_containers=task["init_containers"])
             tasks_details_lines.append(click.style("    Init containers:", bold=True))
-            tasks_details_lines.extend(
-                "        " + line
-                for line in init_containers_lines
-            )
+            tasks_details_lines.extend("        " + line for line in init_containers_lines)
 
     return tasks_details_lines
 
@@ -448,13 +448,13 @@ def shared_build_options(func: Callable) -> Callable:
     "-v",
     "--verbose",
     help="Show extra verbose output. NOTE: Do no rely on the format of the verbose output",
-    is_flag=True
+    is_flag=True,
 )
 @click.option(
     "-d",
     "--debug",
     help="show logs to debug the toolforge-* packages. For extra verbose output for say build or job, see --verbose",
-    is_flag=True
+    is_flag=True,
 )
 @click.pass_context
 def toolforge(ctx: click.Context, verbose: bool, debug: bool) -> None:
@@ -546,9 +546,28 @@ def build_start(
 
 
 @build.command(name="logs", help="Show the logs for a build")
-@click.argument("RUN_NAME")
+@click.argument("RUN_NAME", required=False)
 @shared_build_options
-def build_logs(run_name: str, kubeconfig: Path) -> None:
+def build_logs(run_name: Optional[str], kubeconfig: Path) -> None:
+    last_build: Optional[dict[str, Any]] = None
+    if not run_name:
+        k8s_client = _get_build_k8s(kubeconfig=kubeconfig)
+        last_build = _get_last_build(k8s_client=k8s_client)
+
+        if not last_build:
+            click.echo(
+                click.style(
+                    (
+                        "No builds found, you can start one using `toolforge build start`,"
+                        + "run `toolforge build start --help` for more details"
+                    ),
+                    fg="yellow",
+                )
+            )
+            return
+
+        run_name = last_build["metadata"]["name"]
+
     config = _load_config_from_ctx()
     builds_client = ToolforgeClient(
         kubeconfig=Kubeconfig.load(kubeconfig.expanduser().resolve()),
@@ -585,18 +604,20 @@ def build_list(kubeconfig: Path, json: bool) -> None:
     click.echo(
         tabulate(
             [_run_to_list_entry(run_data=run_data) for run_data in run_datas],
-            headers=_format_headers([
-                "run_image",
-                "status",
-                "start_time",
-                "end_time",
-                "source_url",
-                "ref",
-                "repo_url",
-                "image_name",
-                "image_tag",
-                "builder_image",
-            ]),
+            headers=_format_headers(
+                [
+                    "run_image",
+                    "status",
+                    "start_time",
+                    "end_time",
+                    "source_url",
+                    "ref",
+                    "repo_url",
+                    "image_name",
+                    "image_tag",
+                    "builder_image",
+                ]
+            ),
             tablefmt="plain",
         )
     )
@@ -730,15 +751,16 @@ def build_delete(kubeconfig: Path, build_name: List[str], all: bool, yes_i_know:
 def build_show(ctx, run_name: str, kubeconfig: Path, json: bool) -> None:
     verbose = ctx.obj.get("verbose", False)
     k8s_client = _get_build_k8s(kubeconfig=kubeconfig)
-    method_kwargs = {"kind": "pipelineruns"}
     if run_name:
-        method_kwargs["name"] = run_name
-        raw_run = _execute_k8s_client_method(method=k8s_client.get_object, kwargs=method_kwargs)
+        raw_run = _execute_k8s_client_method(
+            method=k8s_client.get_object,
+            kwargs={
+                "kind": "pipelineruns",
+                "name": run_name,
+            },
+        )
     else:
-        method_kwargs["selector"] = f"user={k8s_client.user}"
-        raw_runs = _execute_k8s_client_method(method=k8s_client.get_objects, kwargs=method_kwargs)
-        raw_runs = sorted(raw_runs, key=lambda raw_run: raw_run["metadata"]["creationTimestamp"], reverse=True)
-        raw_run = raw_runs[0] if len(raw_runs) > 0 else None
+        raw_run = _get_last_build(k8s_client=k8s_client)
 
     if not raw_run:
         click.echo(

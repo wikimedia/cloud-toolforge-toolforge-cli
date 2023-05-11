@@ -10,9 +10,8 @@ ERROR_STRINGS = {
         + "please contact us or open a bug:\nsee https://phabricator.wikimedia.org/T324822"
     ),
     "UNKNOWN_ERROR": (
-        "An unknown error occured while trying to perform this operation.\nIf the problem persists, " +
-        "please contact us or open a bug:\nsee https://phabricator.wikimedia.org/T324822"
-
+        "An unknown error occured while trying to perform this operation.\nIf the problem persists, "
+        + "please contact us or open a bug:\nsee https://phabricator.wikimedia.org/T324822"
     ),
 }
 
