@@ -1,3 +1,15 @@
+toolforge-cli (0.3.0) buster; urgency=medium
+
+  [ Francesco Negri ]
+  * [a4f659f] Explain how to build using wmcs-package-build
+
+  [ David Caro ]
+  * [fe58b2d] cli: add build logs subcommand
+  * [4f152c2] build.logs: use last known build if none passed
+  * [a29e7b0] build: add buster and allow specifying the version
+
+ -- David Caro <dcaro@wikimedia.org>  Tue, 16 May 2023 16:03:47 +0000
+
 toolforge-cli (0.2.11) buster; urgency=medium
 
   * [3d680c4] debian: do not exclude packaging files
