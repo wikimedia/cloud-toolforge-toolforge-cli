@@ -1,7 +1,8 @@
 #!/bin/bash
 
-set -o pipefail
+set -x
 set -o nounset
+set -o pipefail
 set -o errexit
 
 DEST_DISTRO=buster

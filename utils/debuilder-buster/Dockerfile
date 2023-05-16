@@ -1,7 +1,7 @@
-FROM docker-registry.wikimedia.org/bullseye
+FROM docker-registry.wikimedia.org/buster
 ARG DEBIAN_FRONTEND noninteractive
 
-COPY bullseye-backports.list /etc/apt/sources.list.d/
+COPY buster-backports.list /etc/apt/sources.list.d/
 RUN apt update -y \
     && apt install -y ca-certificates
 
